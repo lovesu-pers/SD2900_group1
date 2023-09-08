@@ -1,5 +1,6 @@
 function para = atmos(H, ID)
 
+    % Sea level constants
     T0 = 288.15;
     p0 = 101325;
     rho0 = 1.225;
