@@ -11,7 +11,7 @@ set(groot, 'DefaultAxesLineWidth', 1)
 set(groot, 'DefaultLineLineWidth', 2)
 
 
-%% Refrence parameters
+%% Reference parameters
 T0 = 288.15;
 p0 = 101325;
 rho0 = 1.225;
@@ -20,8 +20,8 @@ g0 = 9.81;
 
 
 %%
-%  Inital state vector
-X_init = 1e-8;
+%  Initial state vector
+X_init = 0;
 H_init = 1e-8;
 Xdot_init = 0;
 Hdot_init = 0;
@@ -34,14 +34,14 @@ d_1 = d_SV;
 d_2 = d_SV;
 
 
-massfrac_v = [0.3061, 0.3450];  % mf/m0
-m0 = [2822,642]*1e3;            % Inital mass
+massfrac_v = [0.3061, 0.6*0.3450];  % mf/m0
+m0 = [2822,642]*1e3;            % Initial mass
 mf = m0.*massfrac_v;            % Final mass
 mp = m0 - m0.*massfrac_v;       % Propellant mass
 m_empt = m0 - mp;               
 
-T_sv = 1*[34500,6500]*1e3;      % Stage thrust
-I_SP_V = [263, 390];            % Stage I_SP
+T_sv = [0.9*34500,1.5*6500]*1e3;      % Stage thrust
+I_SP_V = [1.1*263, 1.1*390];            % Stage I_SP
 
 % Mass flow for each stage
 mdot_v = T_sv./(9.8*I_SP_V);
@@ -49,16 +49,17 @@ mdot_v = T_sv./(9.8*I_SP_V);
 Delta_V = -g0*I_SP_V.*log(massfrac_v); % Delta V for each stage 
 Delta_V_TOT = sum(Delta_V)
 
-t_turn = 1.5; % Start of gravity turn after launch in sec
+t_turn = 5; % Start of gravity turn after launch in sec
 t_bo = (m0-m0.*massfrac_v) ./ (T_sv./(g0*I_SP_V));  % Burn time for each stage
-t_sep = [2,2];                                      % Seperation time
+t_sep = [2,2];                                      % Separation time
+
 
 AV = [pi*(d_1/2)^2,pi*(d_1/2)^2];   % Stage cross sections
 
-C_D = 0.05; % approx drag coeff, independent of Re
+C_D = 0.04; % approx drag coeff, independent of Re
 
 %% Simulation parameters
-dt_max = 1e-2; % Max timestep befor grav.turn
+dt_max = 1e-2; % Max timestep before grav.turn
 tspan_in = [0, t_turn]; % Inital simulation interval befor turn
 
 tspan = [t_turn+dt_max, 2*sum(t_bo)]; % Time interval for rest of launch
@@ -85,7 +86,7 @@ X_R = U(:,1);
 H_R = U(:,3);
 V_R = sqrt(U(:,2).^2 + U(:,4).^2);
 X_R0 = (R_earth./(R_earth+H_R));
-a_R = gradient(V_R);
+a_R = gradient(V_R,t);
 
 % Delta V calculations 
 delta_V_air = -cumtrapz(t,C_D*AV(1).*atmos(H_R,12).*V_R.^2. ...
@@ -94,7 +95,7 @@ delta_V_air_tot = -trapz(t, C_D*AV(1).*atmos(H_R,12) ...
     .*V_R.^2./(2*mass_func(t,t_bo,mdot_v,m0,t_sep)));
 
 delta_V_grav = -cumtrapz(t,gfunc(H_R).*sin(gamma));
-delta_V_grav_tot = -trapz(t,gfunc(H_R));
+delta_V_grav_tot = -trapz(t,gfunc(H_R).*sin(gamma));
 
 
 rhot = zeros(1,length(H_R)); % Density during launch as function time
@@ -121,6 +122,7 @@ legend('$X$','$H$','Burn-out stage 1', 'Burn-out stage 2', 'Location','northwest
 
 
 figure(3)
+set(gcf,'Position',[100,100,900,600])
 subplot(6,1,1)
 plot(t, gamma*180/pi)
 ylabel('Angle $\gamma$ [$^{\mathrm{o}}$]')
@@ -201,7 +203,7 @@ ylabel('$\Delta V_\mathrm{grav}$ [km/s]')
 
 subplot(3,1,3)
 plot(t,V_R-(delta_V_grav+delta_V_air))
-yline(Delta_V_TOT,'-o')
+yline(Delta_V_TOT,'-')
 xlabel('$t$ [s]')
 
 %%
@@ -227,15 +229,31 @@ xlabel('$t$ [s]')
 
 %%
 figure(8)
-subplot(2,1,1)
+subplot(4,1,1)
 plot(t, gamma*180/pi)
 xlim([0, 2*t_turn])
 xline(t_turn)
+ylabel('Angle $\gamma$ [$^{\mathrm{o}}$]')
 
-subplot(2,1,2)
-plot(t, gradient(gamma))
+subplot(4,1,2)
+plot(t, gradient(gamma,t))
 xlim([0, 2*t_turn])
 xline(t_turn)
+ylabel('$\dot{\gamma}$ [$^{\mathrm{o}}$/s]')
+
+subplot(4,1,3)
+plot(t, V_R)
+xlim([0, 2*t_turn])
+xline(t_turn)
+ylabel('$V$ [m/s]')
+
+subplot(4,1,4)
+plot(t, H_R)
+ylabel('$H$ [m]')
+xlim([0, 2*t_turn])
+xline(t_turn)
+xlabel('$t$ [s]')
+
 %%
 function m = mass_func(t,t_bov,mdot_v,m0,t_sep)
     if t<t_bov(1)
@@ -276,8 +294,8 @@ end
 function dUdt = odefun(t,U,C_D,AV,t_bo,mdot_v,m0v,T_sv,t_turn,t_sep)
     % initiates gravity turn
     if t==t_turn
-        U(2) = 1e-1;
-        U(1) = 1e-8;
+        U(2) = 2000e-1;
+        U(1) = 500e-1;
     end
     
     dUdt = zeros(4,1);
