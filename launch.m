@@ -10,7 +10,7 @@ set(groot,'defaultAxesTickLabelInterpreter','latex');
 set(groot, 'DefaultAxesLineWidth', 1)
 set(groot, 'DefaultLineLineWidth', 2)
 
-Clrs = linspecer(7);
+
 %%
 T0 = 288.15;
 p0 = 101325;
@@ -20,7 +20,7 @@ alt = 0:100:90e3;
 
 %%
 X_init = 1e-8;
-H_init = 10;
+H_init = 1e-8;
 Xdot_init = 0;
 Hdot_init = 0;
 downrange_start = 0;
@@ -108,35 +108,35 @@ legend('$X$','$H$','Burn-out stage 1', 'Burn-out stage 2', 'Location','northwest
 
 figure(3)
 subplot(6,1,1)
-plot(t, gamma*180/pi, Color=Clrs(1,:))
+plot(t, gamma*180/pi)
 ylabel('Angle $\gamma$ [$^{\mathrm{o}}$]')
 xline((t_bo(1)))
 xline(sum(t_bo),'--')
 
 
 subplot(6,1,2)
-plot(t, [0;diff(gamma*180/pi)], Color=Clrs(2,:))
+plot(t, [0;diff(gamma*180/pi)])
 ylabel('$\dot{\gamma}$ [$^{\mathrm{o}}$/s]')
 xline((t_bo(1)))
 xline(sum(t_bo),'--')
 
 
 subplot(6,1,3)
-plot(t,X_R./1000, Color=Clrs(3,:))
+plot(t,X_R./1000)
 ylabel('$X$ [km]')
 xline((t_bo(1)))
 xline(sum(t_bo),'--')
 
 
 subplot(6,1,4)
-plot(t,H_R./1000, Color=Clrs(4,:))
+plot(t,H_R./1000)
 ylabel('$H$ [km]')
 xline((t_bo(1)))
 xline(sum(t_bo),'--')
 
 V_req = sqrt((R_earth+H_R).*gfunc(H_R) )/1e3;
 subplot(6,1,5)
-plot(t, V_R / 1000, Color=Clrs(7,:))
+plot(t, V_R / 1000)
 hold on
 plot(t, V_req, '-k')
 hold off
