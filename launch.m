@@ -11,90 +11,104 @@ set(groot, 'DefaultAxesLineWidth', 1)
 set(groot, 'DefaultLineLineWidth', 2)
 
 
-%%
+%% Refrence parameters
 T0 = 288.15;
 p0 = 101325;
 rho0 = 1.225;
 R_earth = 6371*1e3;
-alt = 0:100:90e3;
+g0 = 9.81;
+
 
 %%
+%  Inital state vector
 X_init = 1e-8;
 H_init = 1e-8;
 Xdot_init = 0;
 Hdot_init = 0;
-downrange_start = 0;
+
 U0 = [X_init,Xdot_init,H_init,Hdot_init];
 
-g0 = 9.81;
-
+% Stage diameters
 d_SV = 14.6;
-d_1 = d_SV*1;
-d_2 = d_SV*1;
+d_1 = d_SV;
+d_2 = d_SV;
 
 
-massfrac_v = [0.3061, 0.3450];
-m0 = [2822,500]*1e3;
+massfrac_v = [0.3061, 0.3450];  % mf/m0
+m0 = [2822,642]*1e3;            % Inital mass
+mf = m0.*massfrac_v;            % Final mass
+mp = m0 - m0.*massfrac_v;       % Propellant mass
+m_empt = m0 - mp;               
 
-mf = m0 - m0.*massfrac_v;
+T_sv = 1*[34500,6500]*1e3;      % Stage thrust
+I_SP_V = [263, 390];            % Stage I_SP
 
-m_empt = m0 - mf;
-
-T_sv = 1*[34500,6500]*1e3;
-I_SP_V = [263, 390];
-
+% Mass flow for each stage
 mdot_v = T_sv./(9.8*I_SP_V);
 
-Delta_V = -g0*I_SP_V.*log(1./mf);
+Delta_V = -g0*I_SP_V.*log(massfrac_v); % Delta V for each stage 
 Delta_V_TOT = sum(Delta_V)
 
-t_turn = 3;
-t_bo = (m0-m0.*massfrac_v) ./ (T_sv./(g0*I_SP_V));
-t_sep = [2,2];
+t_turn = 1.5; % Start of gravity turn after launch in sec
+t_bo = (m0-m0.*massfrac_v) ./ (T_sv./(g0*I_SP_V));  % Burn time for each stage
+t_sep = [2,2];                                      % Seperation time
 
-AV = [pi*(d_1/2)^2,pi*(d_1/2)^2];
+AV = [pi*(d_1/2)^2,pi*(d_1/2)^2];   % Stage cross sections
 
-C_D = 0.05;
+C_D = 0.05; % approx drag coeff, independent of Re
 
-%%
-dt_max = 1e-2;
-tspan_in = [0, t_turn];
-tspan = [t_turn+dt_max, 2*sum(t_bo)];
-opts = odeset('MaxStep',dt_max);
-opts_main = odeset('MaxStep',1);
-% opts_main = odeset('Stats','off') ;
+%% Simulation parameters
+dt_max = 1e-2; % Max timestep befor grav.turn
+tspan_in = [0, t_turn]; % Inital simulation interval befor turn
 
-[t_in,U_in] = ode45(@(t,U) odefun(t,U,C_D,AV,t_bo,mdot_v,m0,T_sv,t_turn,t_sep), tspan_in, U0, opts);
-[t_main,U_main] = ode45(@(t,U) odefun(t,U,C_D,AV,t_bo,mdot_v,m0,T_sv,t_turn,t_sep), tspan, U_in(end,:), opts_main);
+tspan = [t_turn+dt_max, 2*sum(t_bo)]; % Time interval for rest of launch
+
+% ODE45 options
+opts = odeset('MaxStep',dt_max); % Fine mesh for pre turn launch
+opts_main = odeset('MaxStep',1); % Let ODE45 choose step size
+
+% Runs the two simulation sections
+[t_in,U_in] = ode45(@(t,U) odefun(t,U,C_D,AV,t_bo,mdot_v,m0,T_sv,t_turn,t_sep), ...
+    tspan_in, U0, opts);
+[t_main,U_main] = ode45(@(t,U) odefun(t,U,C_D,AV,t_bo,mdot_v,m0,T_sv,t_turn,t_sep), ...
+    tspan, U_in(end,:), opts_main);
+
 t = [t_in; t_main];
 U = [U_in; U_main];
 
+% Results
 test = U(:,2)./sqrt(U(:,2).^2+U(:,4).^2);
-gamma = acos(U(:,2)./sqrt(U(:,2).^2+U(:,4).^2));
+gamma = acos(U(:,2)./sqrt(U(:,2).^2+U(:,4).^2)); % Radians limited to [0,pi]
+gamma(1) = pi/2; % Fix
+
 X_R = U(:,1);
 H_R = U(:,3);
 V_R = sqrt(U(:,2).^2 + U(:,4).^2);
 X_R0 = (R_earth./(R_earth+H_R));
-
 a_R = gradient(V_R);
 
-delta_V_air = -cumtrapz(t,C_D*AV(1).*atmos(H_R,12).*V_R.^2./(2*mass_func(t,t_bo,mdot_v,m0,t_sep)));
-delta_V_air_tot = -trapz(t, C_D*AV(1).*atmos(H_R,12).*V_R.^2./(2*mass_func(t,t_bo,mdot_v,m0,t_sep)));
-delta_V_grav = -cumtrapz(t,gfunc(H_R));
+% Delta V calculations 
+delta_V_air = -cumtrapz(t,C_D*AV(1).*atmos(H_R,12).*V_R.^2. ...
+    /(2*mass_func(t,t_bo,mdot_v,m0,t_sep))); % Cumulative integral
+delta_V_air_tot = -trapz(t, C_D*AV(1).*atmos(H_R,12) ... 
+    .*V_R.^2./(2*mass_func(t,t_bo,mdot_v,m0,t_sep)));
+
+delta_V_grav = -cumtrapz(t,gfunc(H_R).*sin(gamma));
 delta_V_grav_tot = -trapz(t,gfunc(H_R));
 
-rho_launch = zeros(1,length(H_R));
-mt = zeros(1,length(H_R));
-Tt = zeros(1,length(H_R));
+
+rhot = zeros(1,length(H_R)); % Density during launch as function time
+mt = zeros(1,length(H_R));   % Rocket mass during launch as function time
+Tt = zeros(1,length(H_R));  % Thrust during launch as function time
 for j = 1:length(H_R)
-    rho_launch(j) = atmos(H_R(j),12);
+    rhot(j) = atmos(H_R(j),12);
     mt(j) = mass_func(t(j),t_bo,mdot_v,m0,t_sep);
     Tt(j) = thrust_func(t(j),t_bo,T_sv,t_sep);
-    j
 end
 
-q_R = 0.5*V_R.^2.*rho_launch';
-%%
+% Dynamic pressure during launch as function time
+q_R = 0.5*V_R.^2.*rhot';
+%% Figures
 figure(2)
 plot(t,X_R./1000,t,H_R./1000)
 xlabel('$t$ [s]')
@@ -165,7 +179,7 @@ xlim([0,500])
 
 figure(5)
 subplot(2,1,1)
-plot(t, rho_launch)
+plot(t, rhot)
 ylabel('$\rho$ [kg/m$^3$]')
 xline(sum(t_bo))
 subplot(2,1,2)
@@ -212,6 +226,17 @@ ylabel('$a$ [m/s$^2$]')
 xlabel('$t$ [s]')
 
 %%
+figure(8)
+subplot(2,1,1)
+plot(t, gamma*180/pi)
+xlim([0, 2*t_turn])
+xline(t_turn)
+
+subplot(2,1,2)
+plot(t, gradient(gamma))
+xlim([0, 2*t_turn])
+xline(t_turn)
+%%
 function m = mass_func(t,t_bov,mdot_v,m0,t_sep)
     if t<t_bov(1)
         m = m0(1) - t*mdot_v(1);
@@ -249,13 +274,12 @@ function g =  gfunc(H)
 end
 
 function dUdt = odefun(t,U,C_D,AV,t_bo,mdot_v,m0v,T_sv,t_turn,t_sep)
-%     if abs(t_turn-t)<1e-5
-%         U(2) = 100e-8;
-%     end
+    % initiates gravity turn
     if t==t_turn
         U(2) = 1e-1;
         U(1) = 1e-8;
     end
+    
     dUdt = zeros(4,1);
     m = mass_func(t,t_bo,mdot_v,m0v,t_sep);
     cosgamma = U(2)/sqrt(U(2)^2+U(4)^2);
@@ -274,12 +298,7 @@ function dUdt = odefun(t,U,C_D,AV,t_bo,mdot_v,m0v,T_sv,t_turn,t_sep)
     else
         A = AV(2);
     end
-    
-    if t>t_bo(2)
-        T
-    end
-
-
+   
     dUdt(1) = U(2);
     dUdt(2) = T*cosgamma/m - 0.5*cosgamma/m*rho*C_D*A*(U(2)^2+U(4)^2)- ... 
         U(2)*U(4)/(R_earth + U(3));
