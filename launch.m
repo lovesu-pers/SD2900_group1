@@ -62,17 +62,19 @@ C_D = 0.04; % approx drag coeff, independent of Re
 dt_max = 1e-2; % Max timestep before grav.turn
 tspan_in = [0, t_turn]; % Inital simulation interval befor turn
 
-tspan = [t_turn+dt_max, 2*sum(t_bo)]; % Time interval for rest of launch
+tspan = [t_turn+dt_max, 20*sum(t_bo)]; % Time interval for rest of launch
 
 % ODE45 options
 opts = odeset('MaxStep',dt_max); % Fine mesh for pre turn launch
-opts_main = odeset('MaxStep',1); % Let ODE45 choose step size
+opts_main = odeset('Reltol',5e-14,'AbsTol',1e-14,'Stats','on'); % Let ODE78 choose step size
 
 % Runs the two simulation sections
+tic % Used to check performance of solvers, can be ignored
 [t_in,U_in] = ode45(@(t,U) odefun(t,U,C_D,AV,t_bo,mdot_v,m0,T_sv,t_turn,t_sep), ...
     tspan_in, U0, opts);
-[t_main,U_main] = ode45(@(t,U) odefun(t,U,C_D,AV,t_bo,mdot_v,m0,T_sv,t_turn,t_sep), ...
+[t_main,U_main] = ode78(@(t,U) odefun(t,U,C_D,AV,t_bo,mdot_v,m0,T_sv,t_turn,t_sep), ...
     tspan, U_in(end,:), opts_main);
+toc % Used to check performance of solvers, can be ignored
 
 t = [t_in; t_main];
 U = [U_in; U_main];
@@ -109,7 +111,13 @@ end
 
 % Dynamic pressure during launch as function time
 q_R = 0.5*V_R.^2.*rhot';
-%% Figures
+
+R = R_earth+H_R;
+theta = X_R./(R);
+
+cart_x = R.*sin(theta);
+cart_y = R.*cos(theta);
+%% Entire launch profile
 figure(2)
 plot(t,X_R./1000,t,H_R./1000)
 xlabel('$t$ [s]')
@@ -120,7 +128,7 @@ legend('$X$','$H$','Burn-out stage 1', 'Burn-out stage 2', 'Location','northwest
 
 
 
-
+%% Misc data
 figure(3)
 set(gcf,'Position',[100,100,900,600])
 subplot(6,1,1)
@@ -170,7 +178,7 @@ xline(sum(t_bo),'--')
 
 
 
-
+%% Profile for first 500 km in arc length
 figure(4)
 plot(U(:,1)./1000,H_R./1000)
 xlabel('$x$ [km]')
@@ -178,7 +186,7 @@ ylabel('$y$ [km]')
 xlim([0,500])
 
 
-
+%% Air density and gravity during launch
 figure(5)
 subplot(2,1,1)
 plot(t, rhot)
@@ -191,7 +199,7 @@ xlabel('$t$ [s]')
 xline((t_bo(1)))
 xline(sum(t_bo),'--')
 
-%%
+%% Delta V losses and total expended Delta V
 figure(6)
 subplot(3,1,1)
 plot(t, delta_V_air./1e3)
@@ -206,7 +214,7 @@ plot(t,V_R-(delta_V_grav+delta_V_air))
 yline(Delta_V_TOT,'-')
 xlabel('$t$ [s]')
 
-%%
+%% Mass, thrust to weight, and accel plots
 
 figure(7)
 subplot(4,1,1)
@@ -227,7 +235,7 @@ plot(t, a_R)
 ylabel('$a$ [m/s$^2$]')
 xlabel('$t$ [s]')
 
-%%
+%% Inital turn plots
 figure(8)
 subplot(4,1,1)
 plot(t, gamma*180/pi)
@@ -253,6 +261,29 @@ ylabel('$H$ [m]')
 xlim([0, 2*t_turn])
 xline(t_turn)
 xlabel('$t$ [s]')
+
+
+%% Orbit in cartesian coords
+xx = [cart_x, cart_x]./1e3;
+yy = [cart_y, cart_y]./1e3;
+zz = -ones(size(xx));
+
+figure(9)
+% plot(cart_x./1e3,cart_y./1e3, 'Color', 'r', 'LineWidth',2);
+surf(xx,yy,zz,[t,t],'LineWidth',3,'EdgeColor','interp',FaceColor='none')
+
+circ([0,0], R_earth./1e3, 3);
+
+
+
+xlabel('$x_{cart}$ [km]')
+ylabel('$y_{cart}$ [km]')
+legend('Orbit', 'Earth')
+axis equal
+view(2)
+colormap("parula")
+axis padded
+
 
 %%
 function m = mass_func(t,t_bov,mdot_v,m0,t_sep)
@@ -324,4 +355,15 @@ function dUdt = odefun(t,U,C_D,AV,t_bo,mdot_v,m0v,T_sv,t_turn,t_sep)
     dUdt(4) = T*singamma/m - 0.5*rho*singamma/m*C_D*A*(U(2)^2+U(4)^2)- ... 
         (g-U(2)^2/(R_earth + U(3)));
     dUdt = fillmissing(dUdt,"constant",0);
+end
+
+function C = circ(cntr, r, dim)
+    tau = linspace(0,2*pi);
+    x = r*cos(tau)+cntr(1);
+    y = r*sin(tau)+cntr(2);
+    if dim == 2
+        C = patch(x,y,'blue');
+    else
+        C = patch([x,x],[y,y],zeros(size([x,x])));
+    end
 end
