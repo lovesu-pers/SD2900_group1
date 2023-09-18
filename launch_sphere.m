@@ -1,0 +1,426 @@
+clear
+close all
+clc
+set(groot,'defaulttextinterpreter','latex');
+set(groot,'defaultLegendInterpreter','latex');
+set(groot, 'DefaultAxesFontSize',15);
+set(groot,'defaultAxesTickLabelInterpreter','latex');  
+set(groot, 'DefaultAxesLineWidth', 1)
+set(groot, 'DefaultLineLineWidth', 2)
+
+%%%% Reqs: Mapping and Aerospace toolbox
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% Constants and conversion factors %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+d2r = pi/180;
+r2d = 180/pi;
+RE = 6371e3;
+muE = 3.986e5 * (1e3)^3; %m^3/s^2
+g0 = 9.80665;
+omegaE = [0;0;7.292115855377074e-5;];
+
+earth_REF = referenceSphere('Earth');
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%% Launch site %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+h0 = 0;
+lat0 = 45*d2r;
+long0 = 0*d2r;
+r0 = latlong2cart(lat0, long0, h0);
+rmag = norm(r0);
+V0 = [0;0;0];
+VErot = cross([0;0;muE],r0);
+turn_azi = 0*d2r;
+turn_fp = 89.59*d2r;
+turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
+        cos(turn_fp)*sin(turn_azi); ...
+        sin(turn_fp)];
+[X_turn, Y_turn, Z_turn] = enu2ecef(turnvec(1),turnvec(2),turnvec(3), ... 
+    lat0,long0,h0,earth_REF,"radians");
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% ROCKET PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Nstage = 1;
+m0     = [68e3];                % Initail/fueled mass kg
+massfraction   = [1/15];        % mf/m0
+mf     = m0*massfraction;       % Final/empty mass
+T0      = [933.0e3];            % Thrust N
+Isp    = [390];                 % Specific impulse s
+d      = [5];                   % Diameter m
+gam0   = 89.82*d2r;             % Flightpath angle at pitchover
+altPO  = 130;                   % Altitude at pitchover
+
+A0      = pi*(d./2).^2; 
+mdot0 = T0./(g0*Isp);
+tbo = (m0-m0.*massfraction) ./ (T0./(g0*Isp));  % Burn time for each stage
+
+
+tstage_index = [1, 0, tbo(1)];       % Stage number, start time, bo-time
+% tstage_index = [1, 0, tbo(1); 
+%                 2, tbov(1)+tsep, tbo(1)+tbo(2)+tsep;
+%                 3, tbov(1)+tbo(2)+2*tsep,  tbo(1)+tbo(2)+tbo(3)+2*tsep];
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%    ODE solving       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+U0 = [r0;V0];
+tfin = 10*60*60;
+
+opts_turn = odeset('RelTol',10e-10, 'Stats','on', ...
+    'Events',@(t,U) turncond(t,U,altPO)); % Let ODE78 choose step size
+opts_main = odeset('RelTol',1e-10, 'MaxStep',1 , ...
+    'Stats','on', 'Events', @crashcond);
+
+% Runs the two simulation sections
+tic % Used to check performance of solvers, can be ignored
+[t_turn,U_turn] = ode45(@(t,U) ode_turn(t,U,m0,mdot0,tstage_index,tbo,T0,A0,altPO), ...
+    [0, 10*60], U0, opts_turn);
+
+V_turn = norm(U_turn(end,4:6)) * ([X_turn; Y_turn; Z_turn] - r0);
+[t_asc,U_asc] = ode45(@(t,U) ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0,altPO), ...
+    [t_turn(end), tfin], [U_turn(end,1:3)';V_turn], opts_main);
+toc % Used to check performance of solvers, can be ignored
+
+% Adds the solution for the two segments
+t_main = [t_turn; t_asc];
+U_main = [U_turn; U_asc];
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%    Postprocessing      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+N = length(t_main);
+
+% Date used to convert between ECI and ECEF
+tt = [2000 1 1 17 15 10];
+epoch = datetime(2000,1,1,17,15,10);
+
+dt = zeros(N,1);
+for k = 2:N
+    dt(k) =  t_main(k) - t_main(k-1);
+end
+
+% Saves results in new vectors
+r_res = U_main(:,1:3);
+V_res = U_main(:,4:6);
+Vmag_res = vecnorm(V_res,2,2); 
+h_res = vecnorm(r_res,2,2) - RE;
+latlong_res = zeros(N,2);
+
+% Max distance from earth CoM
+maxr = max(h_res+RE);
+
+gamma = zeros(N,1);  % Flightpath angle
+mres = zeros(N,1);   % Mass as function of time
+
+Mres = zeros(N,1);   % Mach 
+CDres = zeros(N,1);  % Drag coeff
+for j = 1:N
+    % Lat-Long in ECI
+    [latlong_res(j,1), latlong_res(j,2)] = cart2latlong(r_res(j,:));
+    
+    gamma(j) = gammafunc(r_res(j,:),V_res(j,:));
+    
+    [mres(j),Tres(j),A(j),CDres(j)] = statefunc(t_main(j), ... 
+        m0,mdot0,tstage_index,tbo,T0,A0,V_res(j,:),h0);
+    
+    Mres(j) = norm(V_res(j,:))/atmos(h_res(j),13);
+end
+
+% Uses less points for plotting due to performance
+nf = 500;                   % Number of frames
+sf = floor(N/nf);           % Skip-factor
+
+% Parameters in ECEF
+r_ecef = zeros(nf,3);
+v_ecef = zeros(nf,3);
+latlong_ecef = zeros(nf, 2);
+tsf = zeros(nf,1);
+
+for k = 1:nf
+    tsf(k) = t_main(sf*k);
+    
+    % UTC at time t
+    utc = epoch + seconds(t_main(k*sf));
+    tt = datevec(utc);      % Converts format to 1x6 vector
+    
+    % [r_ecef(k,:), v_ecef(k,:)] = (eci2ecef(utc, r_res(sf*k,:), V_res(sf*k,:)));
+    % latlong_ecef(k,:) = cart2latlong(r_ecef(k,:));
+    % dcm=dcmeci2ecef(reduction,utc)
+    
+    lla = eci2lla(r_res(sf*k,:),tt);
+    latlong_ecef(k,1) = lla(1);
+    latlong_ecef(k,2) = lla(2);
+    disp(['ECEF-calc step: ', num2str(k), ' of ', num2str(nf)])
+end
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Figures %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+figure(5)
+subplot(4,1,1)
+plot(t_main,Vmag_res/1e3)
+ylabel('$|V|$ [km/s]')
+subplot(4,1,2)
+plot(t_main,h_res/1e3)
+ylabel('$|h|$ [km]')
+subplot(4,1,3)
+plot(t_main,mres/1e3)
+ylabel('$m$ [ton]') 
+subplot(4,1,4)
+plot(t_main,gamma)
+ylabel('$\gamma$ [$^o$]')
+xlabel('$t$, [s]')
+
+figure(4)
+subplot(2,1,1)
+plot(t_main, latlong_res(:,1))
+hold on
+plot(tsf, latlong_ecef(:,1),'--')
+hold off
+ylabel('lat [$^o$]')
+legend('ECI','ECEF')
+subplot(2,1,2)
+plot(t_main, latlong_res(:,2))
+hold on
+plot(tsf, latlong_ecef(:,2),'--')
+hold off
+xlabel('$t$, [s]')
+ylabel('long [$^o$]')
+
+
+figure(200)
+geoscatter(latlong_ecef(:,1), latlong_ecef(:,2) )
+
+%%
+figure(201)
+subplot(2,1,1)
+plot(t_main, CDres)
+ylabel('$C_D$ [-]')
+xlim([0,600])
+subplot(2,1,2)
+plot(t_main, Mres)
+ylabel('$M$ [-]')
+xlim([0,600])
+
+f1 = figure(1);
+ax1 = gca;
+ax1.GridLineWidthMode = "auto";
+grid on
+ax1.Projection = "perspective";
+ax1.PlotBoxAspectRatioMode = "manual";
+ax1.PlotBoxAspectRatio = [1 1 1]; 
+ax1.XLim = 1.01*maxr*[-1, 1];
+ax1.YLim = 1.01*maxr*[-1, 1];
+ax1.ZLim = 1.01*maxr*[-1, 1];
+view([30,30])
+% ax2.InteractionOptions = [panInteraction zoomInteraction];
+% f2.Number = 2
+hold on
+[e1, axes1] = earth_test(t_main(end),RE);
+r_rocket = plot3(U_main(:,1),U_main(:,2),U_main(:,3), 'LineWidth',3,'Color','red');
+hold off
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Animation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% I screwd up something here, it shouldn't become more inefficient with
+% time, now it goes fast in the beginning then slows down alot
+f2 = figure(2);
+ax2 = gca;
+ax2.GridLineWidthMode = "auto";
+grid on
+ax2.Projection = "perspective";
+ax2.PlotBoxAspectRatioMode = "manual";
+ax2.PlotBoxAspectRatio = [1 1 1]; 
+ax2.XLim = 1.6*RE*[-1, 1];
+ax2.YLim = 1.6*RE*[-1, 1];
+ax2.ZLim = 1.6*RE*[-1, 1];
+view([30,30])
+% ax2.InteractionOptions = [panInteraction zoomInteraction];
+% f2.Number = 2
+hold on
+[e2, axes] = earth_test(0,RE);
+r_rocket = plot3(U_main(1,1),U_main(1,2),U_main(1,3), 'LineWidth',3,'Color','red');
+hold off
+
+for i = 1:nf
+    axes.reset;   
+    e2.reset;
+
+    [e2, axes] = earth_test(t_main(sf*i),RE);
+    % r_rocket = plot3(U_main(1:i,1),U_main(1:i,2),U_main(1:i,3), 'LineWidth',3,'Color','red');
+    r_rocket.XData =  U_main(1:sf*i,1);
+    r_rocket.YData = U_main(1:sf*i,2);
+    r_rocket.ZData = U_main(1:sf*i,3);
+    
+    drawnow
+    disp(['Movie frame: ', num2str(i), ' of ', num2str(nf)])
+end
+toc
+
+
+%% Functions 
+function dUdt = ode_turn(t,U,m0,mdot0,tstage_index,tbo,T0,A0, altPO)
+    RE = 6371e3;
+
+    dUdt = zeros(4,1);
+    r = U(1:3);
+    V = U(4:6);
+    h = norm(r) - RE;
+    
+    rho = atmos(h,12); 
+    
+    [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h);
+    
+    omegaE = [0;0;7.292115855377074e-5];
+    muE = 3.986e5 * (1e3)^3; %m^3/s^2
+
+
+    rhat = r/norm(r);
+    Vhat = V/norm(V);
+    Vhat(isinf(Vhat)|isnan(Vhat)) = 0;
+
+    g = gfunc(r);
+    if t==0
+        T=T*rhat;
+    else
+        T = T*Vhat;
+    end
+    drag = -0.5*rho * CD * A * (norm(V-cross([0;0;7.292115855377074e-5],r))).^2 /m * Vhat;
+    dUdt(1:3) = V ;
+    dUdt(4:6) = T/m + drag/m + g;
+
+end
+
+function dUdt = ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0, altPO)
+    RE = 6371e3;
+
+    dUdt = zeros(4,1);
+    r = U(1:3);
+    V = U(4:6);
+    h = norm(r) - RE;
+    
+    rho = atmos(h,12); 
+    
+    [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h);
+    
+    omegaE = 0*[0;0;7.292115855377074e-5;];
+    muE = 3.986e5 * (1e3)^3; %m^3/s^2
+
+
+    rhat = r/norm(r);
+    Vhat = V/norm(V);
+    Vhat(isinf(Vhat)|isnan(Vhat)) = 0;
+
+    g = gfunc(r);
+    if t==0
+        T=T*rhat;
+    else
+        T = T*Vhat;
+    end
+    drag = -0.5*rho * CD * A * (norm(V)).^2 /m * Vhat;
+    dUdt(1:3) = V + cross(omegaE,r);
+    dUdt(4:6) = T/m + drag/m + g;
+end
+
+function g =  gfunc(r)
+    muE = 3.986e5 * (1e3)^3;
+    g = - muE/norm(r).^3 .* r;
+end
+
+
+function gamma = gammafunc(r,V)
+    CosTheta = max(min(dot(r,V)/(norm(r)*norm(V)),1),-1);
+    gamma = real(acosd(CosTheta));
+end
+
+function [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h)
+    Nstage = length(m0);
+    
+    M = norm(V)/atmos(h,13); 
+    if M < 0.85
+        CD = 0.2;
+    else
+        CD = 0.11+0.82/M^2-0.55/M^4;
+    end
+        % CD = 0.5;
+    stage = 0;
+    for i = 1:Nstage
+        if stage == 0
+            if t<tstage_index(i,3)
+                stage = i;
+            end
+        end
+    end
+    if t>tstage_index(end,3)
+        m = m0(end) - (tbo(end))*mdot0(end);
+        T = 0;
+        A = A0(end);
+    % elseif t<
+    else
+        m = m0(stage) - mdot0(stage)*(t-tstage_index(stage,2));
+        T = T0(stage);
+        A = A0(stage);
+    end
+    
+end
+
+function r = latlong2cart(lat,long,h)
+    RE = 6371e3;
+    R = RE+h;
+    r = R*[cos(lat)*cos(long); ...
+            cos(lat)*sin(long); ...
+            sin(lat)];
+end
+
+function [lat, long] = cart2latlong(r)
+rmag = norm(r);
+lat = asin(r(3)/rmag)*(180/pi);
+    if (r(1) > 0) 
+        long = atan(r(2)/r(1))*(180/pi);
+    elseif (r(2) > 0) 
+        long = atan(r(2)/r(1))*(180/pi) + 180;
+     else 
+        long = atan(r(2)/r(1))*(180/pi) - 180;
+    end
+end
+
+function [value,isterminal,direction] = turncond(t,U,altPO)
+    RE = 6371e3;
+
+    r = U(1:3);
+
+    h = norm(r) - RE;
+    
+    if h >= altPO
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    else
+        value = 1;
+        isterminal = 0;
+        direction = 0;
+    end
+end
+
+
+function [value,isterminal,direction] = crashcond(t,U)
+    RE = 6371e3;
+
+    r = U(1:3);
+    
+    h = norm(r) - RE;
+
+    if h < 0
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    else
+        value = 1;
+        isterminal = 0;
+        direction = 0;
+    end
+end
