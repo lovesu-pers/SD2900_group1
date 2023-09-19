@@ -44,7 +44,7 @@ T_sv = [0.9*34500,1.5*6500]*1e3;      % Stage thrust
 I_SP_V = [1.1*263, 1.1*390];            % Stage I_SP
 
 % Mass flow for each stage
-mdot_v = T_sv./(9.8*I_SP_V);
+mdot_v = T_sv./(g0*I_SP_V);
 
 Delta_V = -g0*I_SP_V.*log(massfrac_v); % Delta V for each stage 
 Delta_V_TOT = sum(Delta_V)
@@ -60,7 +60,7 @@ C_D = 0.04; % approx drag coeff, independent of Re
 
 %% Simulation parameters
 dt_max = 1e-2; % Max timestep before grav.turn
-tspan_in = [0, t_turn]; % Inital simulation interval befor turn
+tspan_in = [0, t_turn]; % Inital simulation interval before turn
 
 tspan = [t_turn+dt_max, 20*sum(t_bo)]; % Time interval for rest of launch
 

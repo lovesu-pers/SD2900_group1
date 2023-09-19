@@ -15,7 +15,7 @@ if (H < 11000)
         PressRatio = p ./ p0;
         rho = rho0 * theta .^ 4.2561;
         DensRatio = rho ./ rho0;
-        SoundSpeed = sqrt(1.4 * 286.9 * TempRatio * T0);
+        % SoundSpeed = sqrt(1.4 * 286.9 * TempRatio * T0);
       
 elseif ((11000<H)<65617/3.281)
     TempRatio = 0.751865;
@@ -42,7 +42,7 @@ elseif((232940/3.281<H)<278386/3.281)
     PressRatio = (0.917131-H*3.281/637919)^(17.0816);
     DensRatio = (0.900194 - H*3.281/649922)^(16.08160);
 end
-    
+   SoundSpeed = sqrt(1.4 * 286.9 * TempRatio * T0); 
    switch ID
     case 0
         para = TempRatio;
