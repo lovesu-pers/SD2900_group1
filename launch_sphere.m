@@ -31,7 +31,7 @@ r0 = latlong2cart(lat0, long0, h0);
 rmag = norm(r0);
 V0 = [0;0;0];
 VErot = cross([0;0;muE],r0);
-turn_azi = 26.6821*d2r;
+turn_azi = (90 - 26.6821)*d2r;
 turn_fp = 89.59*d2r;
 turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
         cos(turn_fp)*sin(turn_azi); ...
