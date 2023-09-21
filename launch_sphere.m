@@ -9,9 +9,9 @@ set(groot, 'DefaultAxesLineWidth', 1)
 set(groot, 'DefaultLineLineWidth', 2)
 
 %%%% Reqs: Mapping and Aerospace toolbox
-%%
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%% Constants and conversion factors %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Constants and conversion factors %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 d2r = pi/180;
 r2d = 180/pi;
 RE = 6371e3;
@@ -22,7 +22,7 @@ omegaE = [0;0;7.292115855377074e-5;];
 earth_REF = referenceSphere('Earth');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%% Launch site %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Launch site %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Kourou, French Guiana
 h0 = 2;
 lat0 = 5.167713*d2r;
@@ -32,7 +32,7 @@ rmag = norm(r0);
 V0 = [0;0;0];
 VErot = cross([0;0;muE],r0);
 turn_azi = (90 - 26.6821)*d2r;
-turn_fp = 89.59*d2r;
+turn_fp = 89.5*d2r;
 turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
         cos(turn_fp)*sin(turn_azi); ...
         sin(turn_fp)];
@@ -40,55 +40,79 @@ turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
     lat0,long0,h0,earth_REF,"radians");
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%% ROCKET PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Nstage = 1;
-m0     = [68e3];                % Initail/fueled mass kg
-massfraction   = [1/15];        % mf/m0
-mf     = m0*massfraction;       % Final/empty mass
-T0      = [933.0e3];            % Thrust N
-Isp    = [390];                 % Specific impulse s
-d      = [5];                   % Diameter m
-gam0   = 89.82*d2r;             % Flightpath angle at pitchover
-altPO  = 130;                   % Altitude at pitchover
+%% ROCKET PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Nstage = 2;
+m0     = [2780000,677000,215000];                % Initail/fueled mass kg
+massfraction   = [0.2817,0.3663, 1*0.4930];        % mf/m0
+mf     = m0.*massfraction;       % Final/empty mass
+mprop = m0-mf;
+T0      = [33400e3,1.0*4450e3,1.0*2000e3];            % Thrust N
+Isp    = [265,390,421];                 % Specific impulse s
+d      = [10,10,6.6];                   % Diameter m
 
-A0      = pi*(d./2).^2; 
+altPO  = 20;
+tsep   =  1;
+TW = T0./(g0*m0);
+
+A0     = pi*(d./2).^2; 
 mdot0 = T0./(g0*Isp);
-tbo = (m0-m0.*massfraction) ./ (T0./(g0*Isp));  % Burn time for each stage
+tbo = (m0-mf) ./ mdot0;  % Burn time for each stage
+DeltaV = -g0*Isp.*log(massfraction);
+DeltaVtot = sum(DeltaV);
 
-
-tstage_index = [1, 0, tbo(1)];       % Stage number, start time, bo-time
-% tstage_index = [1, 0, tbo(1); 
-%                 2, tbov(1)+tsep, tbo(1)+tbo(2)+tsep;
-%                 3, tbov(1)+tbo(2)+2*tsep,  tbo(1)+tbo(2)+tbo(3)+2*tsep];
-
+tstage_index = [1, 0, tbo(1); 
+                2, tbo(1)+tsep, tbo(2)+tbo(1)+tsep;
+                3, tbo(2)+tbo(1)+2*tsep, tbo(2)+tbo(1)+tbo(3)+2*tsep];       % Stage number, start time, bo-time
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%    ODE solving       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%    ODE solving       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-U0 = [r0;V0];
 tfin = 10*60*60;
+U0 = [r0;V0];
 
 opts_turn = odeset('RelTol',10e-10, 'Stats','on', ...
     'Events',@(t,U) turncond(t,U,altPO)); % Let ODE78 choose step size
 opts_main = odeset('RelTol',1e-10, 'MaxStep',1 , ...
-    'Stats','on', 'Events', @crashcond);
+    'Stats','on', 'Events', @steercond );
 
-% Runs the two simulation sections
+opts_steer = odeset('RelTol',1e-10, 'MaxStep',1 , ...
+    'Stats','on', 'Events',@(t,U) cruisecond(t,U,tstage_index(end,3)));
+
+opts_cruise = odeset('RelTol',1e-10, 'MaxStep',1 , ...
+    'Stats','on', 'Events',@crashcond);
+
+
+% Runs pre-turn launch
 tic % Used to check performance of solvers, can be ignored
 [t_turn,U_turn] = ode45(@(t,U) ode_turn(t,U,m0,mdot0,tstage_index,tbo,T0,A0,altPO), ...
     [0, 10*60], U0, opts_turn);
 
+% Normal gravity turn
+timeatturn = t_turn(end);
+Vatturn = norm(U_turn(end,4:6));
 V_turn = norm(U_turn(end,4:6)) * ([X_turn; Y_turn; Z_turn] - r0);
 [t_asc,U_asc] = ode45(@(t,U) ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0,altPO), ...
     [t_turn(end), tfin], [U_turn(end,1:3)';V_turn], opts_main);
+
+% Controlled turn
+t_steerstart = t_asc(end);
+r_asc = U_asc(end, 1:3);
+V_asc = U_asc(end, 4:6);
+gamma0 = gammafunc(r_asc,V_asc);
+[t_steer,U_steer] = ode45(@(t,U) ode_steer(t,U,m0,mdot0,tstage_index,tbo,T0,A0, gamma0,t_steerstart), ...
+    [t_steerstart, tfin], [r_asc';V_asc'], opts_steer);
+
+% Stops control and cruises
+[t_cruise,U_cruise] = ode45(@(t,U) ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0), ...
+    [t_steer(end), tfin], U_steer(end,:), opts_cruise);
 toc % Used to check performance of solvers, can be ignored
 
-% Adds the solution for the two segments
-t_main = [t_turn; t_asc];
-U_main = [U_turn; U_asc];
 
+% Adds the solution for the segments
+t_main = [t_turn; t_asc;t_steer;t_cruise];
+U_main = [U_turn; U_asc; U_steer;U_cruise];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%    Postprocessing      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%    Postprocessing      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 N = length(t_main);
 
 % Date used to convert between ECI and ECEF
@@ -106,6 +130,7 @@ V_res = U_main(:,4:6);
 Vmag_res = vecnorm(V_res,2,2); 
 h_res = vecnorm(r_res,2,2) - RE;
 latlong_res = zeros(N,2);
+a_res = gradient(Vmag_res,t_main);
 
 % Max distance from earth CoM
 maxr = max(h_res+RE);
@@ -115,6 +140,7 @@ mres = zeros(N,1);   % Mass as function of time
 
 Mres = zeros(N,1);   % Mach 
 CDres = zeros(N,1);  % Drag coeff
+rhot = zeros(N,1);
 for j = 1:N
     % Lat-Long in ECI
     [latlong_res(j,1), latlong_res(j,2)] = cart2latlong(r_res(j,:));
@@ -125,10 +151,13 @@ for j = 1:N
         m0,mdot0,tstage_index,tbo,T0,A0,V_res(j,:),h0);
     
     Mres(j) = norm(V_res(j,:))/atmos(h_res(j),13);
+
+    rhot(j) = atmos(h_res(j),12);
 end
+q_R = 0.5*Vmag_res.^2.*rhot;
 
 % Uses less points for plotting due to performance
-nf = 500;                   % Number of frames
+nf = 100;                   % Number of frames
 sf = floor(N/nf);           % Skip-factor
 
 % Parameters in ECEF
@@ -154,24 +183,35 @@ for k = 1:nf
     disp(['ECEF-calc step: ', num2str(k), ' of ', num2str(nf)])
 end
 
-%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% Figures %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Figures %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 figure(5)
-subplot(4,1,1)
+subplot(5,1,1)
 plot(t_main,Vmag_res/1e3)
 ylabel('$|V|$ [km/s]')
-subplot(4,1,2)
+xline(tstage_index(:,3))
+xline(t_steerstart, '--')
+subplot(5,1,2)
 plot(t_main,h_res/1e3)
 ylabel('$|h|$ [km]')
-subplot(4,1,3)
+xline(tstage_index(:,3))
+xline(t_steerstart, '--')
+subplot(5,1,3)
 plot(t_main,mres/1e3)
 ylabel('$m$ [ton]') 
-subplot(4,1,4)
+xline(tstage_index(:,3))
+xline(t_steerstart, '--')
+subplot(5,1,4)
 plot(t_main,gamma)
 ylabel('$\gamma$ [$^o$]')
+xline(tstage_index(:,3))
+xline(t_steerstart, '--')
+subplot(5,1,5)
+plot(t_main, Tres/1e6)
+ylabel('$T$ [MN]')
 xlabel('$t$, [s]')
+xline(tstage_index(:,3))
 
 figure(4)
 subplot(2,1,1)
@@ -189,11 +229,48 @@ hold off
 xlabel('$t$, [s]')
 ylabel('long [$^o$]')
 
+ttemp = find(t_main<1.1*tstage_index(end,3));
+TT = length(ttemp);
+figure(6)
+subplot(6,1,1)
+plot(ttemp,Vmag_res(1:TT)/1e3)
+ylabel('$|V|$ [km/s]')
+xline(tstage_index(:,3))
+xline(t_steerstart, '--')
+subplot(6,1,2)
+plot(ttemp,h_res(1:TT)/1e3)
+ylabel('$|h|$ [km]')
+xline(tstage_index(:,3))
+xline(t_steerstart, '--')
+subplot(6,1,3)
+plot(ttemp,mres(1:TT)/1e3)
+ylabel('$m$ [ton]') 
+xline(tstage_index(:,3))
+xline(t_steerstart, '--')
+subplot(6,1,4)
+plot(ttemp,gamma(1:TT))
+ylabel('$\gamma$ [$^o$]')
+xline(tstage_index(:,3))
+xline(t_steerstart, '--')
+subplot(6,1,5)
+plot(ttemp, Tres(1:TT)/1e6)
+ylabel('$T$ [MN]')
+xline(tstage_index(:,3))
+subplot(6,1,6)
+plot(ttemp,a_res(1:TT)/g0)
+xlabel('$t$, [s]')
+ylabel('$a/g_0$ [-]')
+xline(tstage_index(:,3))
+
+figure(7)
+plot(ttemp,q_R(1:TT)/1e3)
+xlabel('$t$, [s]')
+ylabel('Dynamic pressure $q$ [kPa]')
+xline(tstage_index(:,3))
 
 figure(200)
 geoscatter(latlong_ecef(:,1), latlong_ecef(:,2) )
 
-%%
 figure(201)
 subplot(2,1,1)
 plot(t_main, CDres)
@@ -215,14 +292,11 @@ ax1.XLim = 1.01*maxr*[-1, 1];
 ax1.YLim = 1.01*maxr*[-1, 1];
 ax1.ZLim = 1.01*maxr*[-1, 1];
 view([30,30])
-% ax2.InteractionOptions = [panInteraction zoomInteraction];
-% f2.Number = 2
+
 hold on
 [e1, axes1] = earth_test(t_main(end),RE);
 r_rocket = plot3(U_main(:,1),U_main(:,2),U_main(:,3), 'LineWidth',3,'Color','red');
 hold off
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Animation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -230,18 +304,19 @@ hold off
 % I screwd up something here, it shouldn't become more inefficient with
 % time, now it goes fast in the beginning then slows down alot
 f2 = figure(2);
+close(f2)
+f2 = figure(2);
 ax2 = gca;
 ax2.GridLineWidthMode = "auto";
 grid on
 ax2.Projection = "perspective";
 ax2.PlotBoxAspectRatioMode = "manual";
 ax2.PlotBoxAspectRatio = [1 1 1]; 
-ax2.XLim = 1.6*RE*[-1, 1];
-ax2.YLim = 1.6*RE*[-1, 1];
-ax2.ZLim = 1.6*RE*[-1, 1];
+ax2.XLim = 1.01*maxr*[-1, 1];
+ax2.YLim = 1.01*maxr*[-1, 1];
+ax2.ZLim = 1.01*maxr*[-1, 1];
 view([30,30])
-% ax2.InteractionOptions = [panInteraction zoomInteraction];
-% f2.Number = 2
+
 hold on
 [e2, axes] = earth_test(0,RE);
 r_rocket = plot3(U_main(1,1),U_main(1,2),U_main(1,3), 'LineWidth',3,'Color','red');
@@ -327,6 +402,52 @@ function dUdt = ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0, altPO)
     dUdt(4:6) = T/m + drag/m + g;
 end
 
+
+function dUdt = ode_steer(t,U,m0,mdot0,tstage_index,tbo,T0,A0, gamma0,t0)
+    RE = 6371e3;   
+    d2r = pi/180;
+    dUdt = zeros(4,1);
+    r = U(1:3);
+    Vold = U(4:6);
+    h = norm(r) - RE;
+    gammaold = gammafunc(r,Vold)*d2r;
+    gammaend = 0.8*pi/2;
+    gamma =  gamma0*d2r + (t-t0)*( (gammaend-gamma0*d2r)/(tstage_index(end,3)-t0)  );
+    
+
+    delta = gamma - gammaold;
+    
+    V = vecrot(r,Vold,delta);
+    
+    
+    rho = atmos(h,12); 
+    
+    [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h);
+    
+    omegaE = 0*[0;0;7.292115855377074e-5;];
+    muE = 3.986e5 * (1e3)^3; %m^3/s^2
+
+
+    rhat = r/norm(r);
+    Vhat = V/norm(V);
+    Vhat(isinf(Vhat)|isnan(Vhat)) = 0;
+    
+    g = gfunc(r);
+    if t==0
+        T=T*rhat;
+    else
+        T = T*Vhat;
+    end
+    drag = -0.5*rho * CD * A * (norm(V)).^2 /m * Vhat;
+    dUdt(1:3) = V + cross(omegaE,r);
+    dUdt(4:6) = T/m + drag/m + g;
+end
+
+function Vnew = vecrot(r,Vold,delta)
+    k = cross(r,Vold)/norm(cross(r,Vold));
+    Vnew = Vold*cos(delta) + (cross(k,Vold))*sin(delta) + k*dot(k,Vold)*(1-cos(delta));
+end
+
 function g =  gfunc(r)
     muE = 3.986e5 * (1e3)^3;
     g = - muE/norm(r).^3 .* r;
@@ -350,17 +471,26 @@ function [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h)
         % CD = 0.5;
     stage = 0;
     for i = 1:Nstage
-        if stage == 0
-            if t<tstage_index(i,3)
-                stage = i;
-            end
+        if i==Nstage
+            stage = i;
+            break;
+        elseif t<tstage_index(i+1,2)
+            stage = i;
+            break;
         end
     end
     if t>tstage_index(end,3)
         m = m0(end) - (tbo(end))*mdot0(end);
         T = 0;
         A = A0(end);
-    % elseif t<
+    elseif stage==Nstage
+        m = m0(stage) - mdot0(stage)*(t-tstage_index(stage,2));
+        T = T0(stage);
+        A = A0(stage);
+    elseif t>tstage_index(stage,3) & t<tstage_index(stage+1,2)
+        m = m0(stage+1);
+        T = 0;
+        A = A0(stage+1);
     else
         m = m0(stage) - mdot0(stage)*(t-tstage_index(stage,2));
         T = T0(stage);
@@ -412,9 +542,8 @@ function [value,isterminal,direction] = crashcond(t,U)
     RE = 6371e3;
 
     r = U(1:3);
-    
+    V = U(4:6);
     h = norm(r) - RE;
-
     if h < 0
         value = 0;
         isterminal = 1;
@@ -424,4 +553,55 @@ function [value,isterminal,direction] = crashcond(t,U)
         isterminal = 0;
         direction = 0;
     end
+
+end
+
+function [value,isterminal,direction] = cruisecond(t,U,stopt)
+    RE = 6371e3;
+
+    r = U(1:3);
+    V = U(4:6);
+    h = norm(r) - RE;
+    if h < 0
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    % elseif h>500e3
+    %     value = 0;
+    %     isterminal = 1;
+    %     direction = 0;
+    elseif t >= 1*stopt
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    else
+        value = 1;
+        isterminal = 0;
+        direction = 0;
+    end
+
+end
+
+function [value,isterminal,direction] = steercond(t,U)
+    RE = 6371e3;
+
+    r = U(1:3);
+    V = U(4:6);
+    h = norm(r) - RE;
+    gamma = gammafunc(r,V);
+
+    if gamma > 50
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    elseif h < 0
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    else
+        value = 1;
+        isterminal = 0;
+        direction = 0;
+    end
+
 end
