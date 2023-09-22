@@ -25,8 +25,8 @@ earth_REF = referenceSphere('Earth');
 %% Launch site %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Kourou, French Guiana
 h0 = 2;
-lat0 = 5.167713*d2r;
-long0 = -52.683994*d2r;
+lat0 =5.167713*d2r;
+long0 =-52.683994*d2r;
 r0 = latlong2cart(lat0, long0, h0);
 rmag = norm(r0);
 V0 = [0;0;0];
@@ -50,7 +50,7 @@ T0      = [33400e3,1.0*4450e3,1.0*2000e3];            % Thrust N
 Isp    = [265,390,421];                 % Specific impulse s
 d      = [10,10,6.6];                   % Diameter m
 
-altPO  = 20;
+altPO  = 200;
 tsep   =  1;
 TW = T0./(g0*m0);
 
@@ -64,7 +64,7 @@ tstage_index = [1, 0, tbo(1);
                 2, tbo(1)+tsep, tbo(2)+tbo(1)+tsep;
                 3, tbo(2)+tbo(1)+2*tsep, tbo(2)+tbo(1)+tbo(3)+2*tsep];       % Stage number, start time, bo-time
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%    ODE solving       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ODE solving       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tfin = 10*60*60;
 U0 = [r0;V0];
@@ -112,7 +112,7 @@ t_main = [t_turn; t_asc;t_steer;t_cruise];
 U_main = [U_turn; U_asc; U_steer;U_cruise];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%    Postprocessing      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Postprocessing      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 N = length(t_main);
 
 % Date used to convert between ECI and ECEF
@@ -126,7 +126,7 @@ end
 
 % Saves results in new vectors
 r_res = U_main(:,1:3);
-V_res = U_main(:,4:6);
+V_res = U_main(:,4:6); 
 Vmag_res = vecnorm(V_res,2,2); 
 h_res = vecnorm(r_res,2,2) - RE;
 latlong_res = zeros(N,2);
@@ -141,6 +141,10 @@ mres = zeros(N,1);   % Mass as function of time
 Mres = zeros(N,1);   % Mach 
 CDres = zeros(N,1);  % Drag coeff
 rhot = zeros(N,1);
+gres = zeros(N,1);
+A = zeros(N,1);
+Tres = zeros(N,1);
+
 for j = 1:N
     % Lat-Long in ECI
     [latlong_res(j,1), latlong_res(j,2)] = cart2latlong(r_res(j,:));
@@ -153,8 +157,19 @@ for j = 1:N
     Mres(j) = norm(V_res(j,:))/atmos(h_res(j),13);
 
     rhot(j) = atmos(h_res(j),12);
+
+    gres(j) = gfunc(h_res(j)+RE);
 end
+
 q_R = 0.5*Vmag_res.^2.*rhot;
+
+% Delta V calculations 
+delta_V_air = -cumtrapz(t_main,CDres.*A.*q_R./mres); % Cumulative integral
+delta_V_air_tot = -trapz(t_main,CDres.*A.*q_R./mres);
+
+delta_V_grav = -cumtrapz(t_main,gres.*cos(0));
+delta_V_grav_tot = -trapz(t_main,gres.*cos(0));
+
 
 % Uses less points for plotting due to performance
 nf = 100;                   % Number of frames
@@ -166,17 +181,14 @@ v_ecef = zeros(nf,3);
 latlong_ecef = zeros(nf, 2);
 tsf = zeros(nf,1);
 
+
 for k = 1:nf
     tsf(k) = t_main(sf*k);
     
     % UTC at time t
     utc = epoch + seconds(t_main(k*sf));
     tt = datevec(utc);      % Converts format to 1x6 vector
-    
-    % [r_ecef(k,:), v_ecef(k,:)] = (eci2ecef(utc, r_res(sf*k,:), V_res(sf*k,:)));
-    % latlong_ecef(k,:) = cart2latlong(r_ecef(k,:));
-    % dcm=dcmeci2ecef(reduction,utc)
-    
+
     lla = eci2lla(r_res(sf*k,:),tt);
     latlong_ecef(k,1) = lla(1);
     latlong_ecef(k,2) = lla(2);
