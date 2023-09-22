@@ -167,8 +167,8 @@ q_R = 0.5*Vmag_res.^2.*rhot;
 delta_V_air = -cumtrapz(t_main,CDres.*A.*q_R./mres); % Cumulative integral
 delta_V_air_tot = -trapz(t_main,CDres.*A.*q_R./mres);
 
-delta_V_grav = -cumtrapz(t_main,gres.*cos(0));
-delta_V_grav_tot = -trapz(t_main,gres.*cos(0));
+delta_V_grav = -cumtrapz(t_main,gres.*cos(gamma*d2r));
+delta_V_grav_tot = -trapz(t_main,gres.*cos(gamma*d2r));
 
 
 % Uses less points for plotting due to performance
@@ -241,7 +241,8 @@ hold off
 xlabel('$t$, [s]')
 ylabel('long [$^o$]')
 
-ttemp = find(t_main<1.1*tstage_index(end,3));
+ttemp = (find(t_main<1.1*tstage_index(end,3)));
+ttemp = t_main(1:ttemp(end));
 TT = length(ttemp);
 figure(6)
 subplot(6,1,1)
@@ -292,6 +293,9 @@ subplot(2,1,2)
 plot(t_main, Mres)
 ylabel('$M$ [-]')
 xlim([0,600])
+
+figure(202)
+plot(t_main, delta_V_grav   )
 
 f1 = figure(1);
 ax1 = gca;
@@ -582,7 +586,7 @@ function [value,isterminal,direction] = cruisecond(t,U,stopt)
     %     value = 0;
     %     isterminal = 1;
     %     direction = 0;
-    elseif t >= 1*stopt
+    elseif t >= 0.9*stopt
         value = 0;
         isterminal = 1;
         direction = 0;
