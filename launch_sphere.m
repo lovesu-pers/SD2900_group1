@@ -1,3 +1,4 @@
+%% Header
 clear
 close all
 clc
@@ -105,7 +106,6 @@ gamma0 = gammafunc(r_asc,V_asc);
 [t_cruise,U_cruise] = ode45(@(t,U) ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0), ...
     [t_steer(end), tfin], U_steer(end,:), opts_cruise);
 toc % Used to check performance of solvers, can be ignored
-
 
 % Adds the solution for the segments
 t_main = [t_turn; t_asc;t_steer;t_cruise];
