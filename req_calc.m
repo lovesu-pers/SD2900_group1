@@ -53,10 +53,14 @@ Delta_V2_SV = Isp_2_SV * g0 * log(m01_SV/mf1_SV);
 
 Delta_Vtot_SV = Delta_V1_SV + Delta_V2_SV; %Total speed increment due to thrust [m/s]
 
-%% Losses (calculated in launch.m)
-Delta_V_air = -80.7963088635336;
-Delta_V_grav = -5754.55567737017;
+%% Losses 
+% Calculated in launch_sphere.m
+Delta_V_air = -41.2334859977086;
+Delta_V_grav = -853.943621262776;
 
+% Preliminary data from slides
+Delta_V_grav_p = -1200;
+Delta_V_air_p = -300;
 %% THE DELTA V WE CAN OBTAIN AT THE MOST IS:
 % Falcon 9
 Delta_V_ach_F9 = Delta_Vtot_F9 + Delta_V_air + Delta_V_grav

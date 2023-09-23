@@ -175,7 +175,7 @@ delta_V_grav_tot = -trapz(t_main,gres.*cos(gamma*d2r));
 
 % Losses are only accounted for during burn time
 delta_V_air_burn = -trapz(t_main(1:i_tbo), CDres(1:i_tbo).*A(1:i_tbo).*q_R(1:i_tbo)./mres(1:i_tbo));
-delta_V_grav_burn = -trapz(t_main(1:i_tbo), gres(1:i_tbo).*cos(gamma(1:i_tbo)*d2r));
+delta_V_grav_burn = trapz(t_main(1:i_tbo), gres(1:i_tbo).*cos(gamma(1:i_tbo)*d2r));
 
 % Uses less points for plotting due to performance
 nf = 100;                   % Number of frames
@@ -485,10 +485,19 @@ function [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h)
     Nstage = length(m0);
     
     M = norm(V)/atmos(h,13); 
+    % if M < 0.85
+    %     CD = 0.2;
+    % else
+    %     CD = 0.11+0.82/M^2-0.55/M^4;
+    % end
     if M < 0.85
         CD = 0.2;
+    elseif (M>=0.85) && (M<1.25)
+        CD = 0.52;
+    elseif (M>=1.25) && (M<3)
+        CD = 0.3;
     else
-        CD = 0.11+0.82/M^2-0.55/M^4;
+        CD = 0.25;
     end
         % CD = 0.5;
     stage = 0;
