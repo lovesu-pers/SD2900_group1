@@ -152,7 +152,7 @@ for j = 1:N
     % Lat-Long in ECI
     [latlong_res(j,1), latlong_res(j,2)] = cart2latlong(r_res(j,:));
     
-    gamma(j) = 90 - gammafunc(r_res(j,:),V_res(j,:)); % Flight path angle, measured from horizontal
+    gamma(j) = gammafunc(r_res(j,:),V_res(j,:)); % Flight path angle, measured from horizontal
     
     [mres(j),Tres(j),A(j),CDres(j)] = statefunc(t_main(j), ... 
         m0,mdot0,tstage_index,tbo,T0,A0,V_res(j,:),h0);
@@ -170,12 +170,12 @@ q_R = 0.5*Vmag_res.^2.*rhot;
 delta_V_air = -cumtrapz(t_main,CDres.*A.*q_R./mres); % Cumulative integral
 delta_V_air_tot = -trapz(t_main,CDres.*A.*q_R./mres);
 
-delta_V_grav = -cumtrapz(t_main,gres.*sin(gamma*d2r));
-delta_V_grav_tot = -trapz(t_main,gres.*sin(gamma*d2r));
+delta_V_grav = -cumtrapz(t_main,gres.*cos(gamma*d2r));
+delta_V_grav_tot = -trapz(t_main,gres.*cos(gamma*d2r));
 
 % Losses are only accounted for during burn time
 delta_V_air_burn = -trapz(t_main(1:i_tbo), CDres(1:i_tbo).*A(1:i_tbo).*q_R(1:i_tbo)./mres(1:i_tbo));
-delta_V_grav_burn = -trapz(t_main(1:i_tbo), gres(1:i_tbo).*sin(gamma(1:i_tbo)*d2r));
+delta_V_grav_burn = -trapz(t_main(1:i_tbo), gres(1:i_tbo).*cos(gamma(1:i_tbo)*d2r));
 
 % Uses less points for plotting due to performance
 nf = 100;                   % Number of frames
