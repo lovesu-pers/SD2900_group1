@@ -59,6 +59,9 @@ A0     = pi*(d./2).^2;
 mdot0 = T0./(g0*Isp);
 tbo = (m0-mf) ./ mdot0;  % Burn time for each stage
 tbo_tot = sum(tbo); % Total burn time for the whole rocket
+i_tbo1 = ceil(tbo(1));
+i_tbo2 = i_tbo1 + ceil(tbo(2));
+i_tbo3 = i_tbo2 + ceil(tbo(3));
 i_tbo = ceil(tbo_tot);
 
 DeltaV = -g0*Isp.*log(massfraction);
@@ -174,6 +177,15 @@ delta_V_grav = -cumtrapz(t_main,gres.*cos(gamma*d2r));
 delta_V_grav_tot = -trapz(t_main,gres.*cos(gamma*d2r));
 
 % Losses are only accounted for during burn time
+delta_V_air_burn1 = -trapz(t_main(1:i_tbo1), CDres(1:i_tbo1).*A(1:i_tbo1).*q_R(1:i_tbo1)./mres(1:i_tbo1));
+delta_V_grav_burn1 = trapz(t_main(1:i_tbo1), gres(1:i_tbo1).*cos(gamma(1:i_tbo1)*d2r));
+
+delta_V_air_burn2 = -trapz(t_main(i_tbo1+1:i_tbo2), CDres(i_tbo1+1:i_tbo2).*A(i_tbo1+1:i_tbo2).*q_R(i_tbo1+1:i_tbo2)./mres(i_tbo1+1:i_tbo2));
+delta_V_grav_burn2 = trapz(t_main(i_tbo1+1:i_tbo2), gres(i_tbo1+1:i_tbo2).*cos(gamma(i_tbo1+1:i_tbo2)*d2r));
+
+delta_V_air_burn3 = -trapz(t_main(i_tbo2+1:i_tbo3), CDres(i_tbo2+1:i_tbo3).*A(i_tbo2+1:i_tbo3).*q_R(i_tbo2+1:i_tbo3)./mres(i_tbo2+1:i_tbo3));
+delta_V_grav_burn3 = trapz(t_main(i_tbo2+1:i_tbo3), gres(i_tbo2+1:i_tbo3).*cos(gamma(i_tbo2+1:i_tbo3)*d2r));
+
 delta_V_air_burn = -trapz(t_main(1:i_tbo), CDres(1:i_tbo).*A(1:i_tbo).*q_R(1:i_tbo)./mres(1:i_tbo));
 delta_V_grav_burn = trapz(t_main(1:i_tbo), gres(1:i_tbo).*cos(gamma(1:i_tbo)*d2r));
 

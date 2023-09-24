@@ -2,6 +2,7 @@
 %% Constants
 g0 = 9.81; % Gravitational acceleration [m/s^2]
 R_Earth = 6371e03; % Earth radius
+T_Earth = 24*3600; % Period of Earth's rotation [s]
 mu = 3.986e14; % Gravitational constant for the Earth
 C_D = 0.04; % approx drag coeff, independent of Re
 
@@ -88,14 +89,24 @@ end
 %% MISSION ITERATIONS
 H_parking = linspace (100, 600, 26)' * 10^3;
 
-Mission_info = zeros(size(H_parking,1) + 1, 5);
+Mission_info = zeros(size(H_parking,1) + 1, 7);
+
+V_EarthROT = 2 * pi / (T_Earth) * R_Earth;
+
+E0 = -mu/R_Earth;
+Ef = Mission_info(1,2)^2/2 - mu/R_parking;
+DeltaE = abs(Ef - E0);
 
 % Direct launch
-Mission_info(1,1) = 0;                         % Height of parking orbit
-Mission_info(1,2) = V_target;                  % Delta_V necessary to get to parking orbit
-Mission_info(1,3) = 0;                         % First Hohmann impulse
-Mission_info(1,4) = 0;                         % Second Hohmann impulse
-Mission_info(1,5) = sum(Mission_info(1,2:4));  % Total Delta_V required for the whole mission
+Mission_info(1,1) = 0;                                          % Height of parking orbit
+Mission_info(1,2) = V_target;                                   % Speed of parking orbit
+Delta_V_launch = roots([0.5, Mission_info(1,2), -DeltaE]);
+Mission_info(1,3) = Delta_V_launch(Delta_V_launch>0);           % Delta_V necessary to reach parking orbit
+Mission_info(1,4) = 0;                                          % First Hohmann impulse
+Mission_info(1,5) = 0;                                          % Second Hohmann impulse
+Mission_info(1,6) = sum(Mission_info(1,4:5));                   % Total Delta_V required for the Hohmann transfer
+Mission_info(1,7) = sum(Mission_info(1,3:5));                   % Total Delta_V required for the whole mission
+
 
 % Launches to parking orbit
 
@@ -107,14 +118,38 @@ Mission_info(2:size(Mission_info,1),1) = H_parking(:);
 
 for i = 2:size(Mission_info,1)
     R_parking = H_parking(i-1) + R_Earth;
-    Mission_info(i-1,2) = sqrt(mu/R_parking);
-
+    Mission_info(i,2) = sqrt(mu/R_parking);
+   
+    E0 = -mu/R_Earth;
+    Ef = Mission_info(i,2)^2/2 - mu/R_parking;
+    DeltaE = abs(Ef - E0);
+    Delta_V_launch = roots([0.5, Mission_info(i,2), -DeltaE]);
+    Mission_info(i,3) = Delta_V_launch(Delta_V_launch>0); 
+    % Launch estimation (without Earth rotation)
+    
     % Hohmann transfer
     a_t = 0.5 * (R_parking + R_Earth + R_target);
     V_A = sqrt(2*mu/R_parking - mu/a_t);
     V_B = sqrt(2*mu/R_target - mu/a_t);
-    Mission_info(i-1,3) = V_A - Mission_info(i-1,2);
-    Mission_info(i-1,4) = V_B - V_target;
-    Mission_info(i-1,5) = sum(Mission_info(i-1,2:4));
+    Mission_info(i,4) = V_A - Mission_info(i,2);
+    Mission_info(i,5) = V_B - V_target;
+    Mission_info(i,6) = sum(Mission_info(i,4:5));
+    Mission_info(i,7) = sum(Mission_info(i,3:5));
 end
+
+%% File export
+H = Mission_info(:,1)';
+V = Mission_info(:,2)';
+Delta_V = Mission_info(:,3)';
+Delta_Vt1 = Mission_info(:,4)';
+Delta_Vt2 = Mission_info(:,5)';
+Delta_VtT = Mission_info(:,6)';
+Delta_VTOT = Mission_info(:,7)';
+
+A = [H;V;Delta_V;Delta_Vt1; Delta_Vt2; Delta_VtT; Delta_VTOT];
+fileID = fopen('Mission_analysis.txt','w');
+FS_header = '%-6s %-10s %-10s %-10s %-10s %-10s %-10s\r\n';
+fprintf(fileID, FS_header, 'H', 'V', 'Delta_V', 'Delta_Vt1', 'Delta_Vt2', 'Delta_VtT', 'Delta_VTOT');
+FS_data = '%-6.0f %-.4e %-.4e %-.4e %-.4e %-.4e %-.4e \r\n';
+fprintf(fileID, FS_data, A);
 
