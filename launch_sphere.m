@@ -490,15 +490,22 @@ function [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h)
     % else
     %     CD = 0.11+0.82/M^2-0.55/M^4;
     % end
+
     if M < 0.85
         CD = 0.2;
-    elseif (M>=0.85) && (M<1.25)
-        CD = 0.52;
-    elseif (M>=1.25) && (M<3)
-        CD = 0.3;
     else
-        CD = 0.25;
+        CD = 0.23+0.82/M^2-0.55/M^4;
     end
+
+    % if M < 0.85
+    %     CD = 0.2;
+    % elseif (M>=0.85) && (M<1.25)
+    %     CD = 0.52;
+    % elseif (M>=1.25) && (M<3)
+    %     CD = 0.3;
+    % else
+    %     CD = 0.25;
+    % end
         % CD = 0.5;
     stage = 0;
     for i = 1:Nstage

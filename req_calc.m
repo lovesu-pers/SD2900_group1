@@ -63,9 +63,58 @@ Delta_V_grav_p = -1200;
 Delta_V_air_p = -300;
 %% THE DELTA V WE CAN OBTAIN AT THE MOST IS:
 % Falcon 9
-Delta_V_ach_F9 = Delta_Vtot_F9 + Delta_V_air + Delta_V_grav
+Delta_V_ach_F9 = Delta_Vtot_F9 + Delta_V_air + Delta_V_grav;
 % Saturn V (2 stages)
-Delta_V_ach_SV = Delta_Vtot_SV + Delta_V_air + Delta_V_grav
+Delta_V_ach_SV = Delta_Vtot_SV + Delta_V_air + Delta_V_grav;
 
-H_max_F9 = (mu / Delta_V_ach_F9^2 - R_Earth)/1000;
-H_max_SV = (mu / Delta_V_ach_SV^2 - R_Earth)/1000;
+%% NECESSARY VELOCITY FOR TARGET ORBIT
+H_target = 1000e03; %1000km
+R_target = H_target + R_Earth;
+
+V_target = sqrt(mu/R_target);
+
+if (Delta_V_ach_F9 > V_target)
+    disp('Direct launch is possible for Falcon 9')
+else 
+    disp('Direct launch is not possible for Falcon 9')
+end 
+
+if (Delta_V_ach_SV > V_target)
+    disp('Direct launch is possible for Saturn V')
+else 
+    disp('Direct launch is not possible for Saturn V')
+end
+
+%% MISSION ITERATIONS
+H_parking = linspace (100, 600, 26)' * 10^3;
+
+Mission_info = zeros(size(H_parking,1) + 1, 5);
+
+% Direct launch
+Mission_info(1,1) = 0;                         % Height of parking orbit
+Mission_info(1,2) = V_target;                  % Delta_V necessary to get to parking orbit
+Mission_info(1,3) = 0;                         % First Hohmann impulse
+Mission_info(1,4) = 0;                         % Second Hohmann impulse
+Mission_info(1,5) = sum(Mission_info(1,2:4));  % Total Delta_V required for the whole mission
+
+% Launches to parking orbit
+
+% Paloma: this is obviously not correct. The benefit to launch first to a
+% parking orbit is that the gravity losses are not accounted for in the
+% transfers, therefore gravity loss is smaller. I need to change that.
+
+Mission_info(2:size(Mission_info,1),1) = H_parking(:);
+
+for i = 2:size(Mission_info,1)
+    R_parking = H_parking(i-1) + R_Earth;
+    Mission_info(i-1,2) = sqrt(mu/R_parking);
+
+    % Hohmann transfer
+    a_t = 0.5 * (R_parking + R_Earth + R_target);
+    V_A = sqrt(2*mu/R_parking - mu/a_t);
+    V_B = sqrt(2*mu/R_target - mu/a_t);
+    Mission_info(i-1,3) = V_A - Mission_info(i-1,2);
+    Mission_info(i-1,4) = V_B - V_target;
+    Mission_info(i-1,5) = sum(Mission_info(i-1,2:4));
+end
+
