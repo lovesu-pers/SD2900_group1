@@ -27,7 +27,7 @@ mf1_F9 = m01_F9 - mp1_F9; % Final mass first stage [kg]
 m02_F9 = mPL + ms2_F9 + mp2_F9; % Initial mass second stage [kg]
 mf2_F9 = m02_F9 - mp2_F9; % Final mass second stage[kg]
 Delta_V1_F9 = Isp_1_F9 * g0 * log(m01_F9/mf1_F9);
-Delta_V2_F9 = Isp_2_F9 * g0 * log(m01_F9/mf1_F9);
+Delta_V2_F9 = Isp_2_F9 * g0 * log(m02_F9/mf2_F9);
 
 Delta_Vtot_F9 = Delta_V1_F9 + Delta_V2_F9; %Total speed increment due to thrust [m/s]
 
