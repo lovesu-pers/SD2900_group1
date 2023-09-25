@@ -33,26 +33,30 @@ rmag = norm(r0);
 V0 = [0;0;0];
 VErot = cross([0;0;muE],r0);
 turn_azi = (90 - 26.6821)*d2r;
-turn_fp = 89.5*d2r;
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ROCKET PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Nstage = 2;
+m0     = [518870,97570];                % Initail/fueled mass kg
+massfraction   = [ 0.2374,0.1];        % mf/m0
+mf     = m0.*massfraction;       % Final/empty mass
+mprop = m0-mf;
+T0      = [0.76*(7607e3),981e3];            % Thrust N
+Isp    = [(283+312)/2,348];                 % Specific impulse s
+d      = [3.7,3.7];                   % Diameter m
+tsep   =  1;
+tstop = 400;  % Time when stage 2 should stop burning
+
+altPO  = 500;
+turn_fp = 89.9*d2r;
 turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
         cos(turn_fp)*sin(turn_azi); ...
         sin(turn_fp)];
 [X_turn, Y_turn, Z_turn] = enu2ecef(turnvec(1),turnvec(2),turnvec(3), ... 
     lat0,long0,h0,earth_REF,"radians");
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% ROCKET PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Nstage = 3;
-m0     = [2780000,677000,215000];                % Initail/fueled mass kg
-massfraction   = [0.2817,0.3663, 1*0.4930];        % mf/m0
-mf     = m0.*massfraction;       % Final/empty mass
-mprop = m0-mf;
-T0      = [33400e3,1.0*4450e3,1.0*2000e3];            % Thrust N
-Isp    = [265,390,421];                 % Specific impulse s
-d      = [10,10,6.6];                   % Diameter m
-
-altPO  = 200;
-tsep   =  1;
 TW = T0./(g0*m0);
 
 A0     = pi*(d./2).^2; 
@@ -61,61 +65,95 @@ tbo = (m0-mf) ./ mdot0;  % Burn time for each stage
 tbo_tot = sum(tbo); % Total burn time for the whole rocket
 i_tbo1 = ceil(tbo(1));
 i_tbo2 = i_tbo1 + ceil(tbo(2));
-i_tbo3 = i_tbo2 + ceil(tbo(3));
 i_tbo = ceil(tbo_tot);
 
 DeltaV = -g0*Isp.*log(massfraction);
 DeltaVtot = sum(DeltaV);
 
 tstage_index = [1, 0, tbo(1); 
-                2, tbo(1)+tsep, tbo(2)+tbo(1)+tsep;
-                3, tbo(2)+tbo(1)+2*tsep, tbo(2)+tbo(1)+tbo(3)+2*tsep];       % Stage number, start time, bo-time
+                2, tbo(1)+tsep, tbo(2)+tbo(1)+tsep];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ODE solving       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tfin = 10*60*60;
-U0 = [r0;V0];
+tfin = 1*60*60;
+U0 = [r0;V0;m0(1)];
+
+
 
 opts_turn = odeset('RelTol',10e-10, 'Stats','on', ...
     'Events',@(t,U) turncond(t,U,altPO)); % Let ODE78 choose step size
-opts_main = odeset('RelTol',1e-10, 'MaxStep',1 , ...
-    'Stats','on', 'Events', @steercond );
 
-opts_steer = odeset('RelTol',1e-10, 'MaxStep',1 , ...
-    'Stats','on', 'Events',@(t,U) cruisecond(t,U,tstage_index(end,3)));
+opts_stage1 = odeset('RelTol',1e-10, 'MaxStep',1 , ...
+    'Stats','on', 'Events', @(t,U) stagecond(t,U,mf,1,inf) );
+
+opts_stage2 = odeset('RelTol',1e-10, 'MaxStep',1 , ...
+    'Stats','on', 'Events', @(t,U) stagecond(t,U,mf,2,tstop) );
 
 opts_cruise = odeset('RelTol',1e-10, 'MaxStep',1 , ...
-    'Stats','on', 'Events',@crashcond);
+    'Stats','on', 'Events',@(t,U) cruisecond(t,U));
+
 
 
 % Runs pre-turn launch
 tic % Used to check performance of solvers, can be ignored
-[t_turn,U_turn] = ode45(@(t,U) ode_turn(t,U,m0,mdot0,tstage_index,tbo,T0,A0,altPO), ...
+[t_turn,U_turn] = ode45(@(t,U) ode_turn(t,U,mdot0,1,1,T0,A0), ...
     [0, 10*60], U0, opts_turn);
 
-% Normal gravity turn
+stage_index = ones(length(t_turn),1);
+thrust_index = T0(1)*ones(length(t_turn),1);
+
+% Normal gravity turn stage 1
 timeatturn = t_turn(end);
 Vatturn = norm(U_turn(end,4:6));
 V_turn = norm(U_turn(end,4:6)) * ([X_turn; Y_turn; Z_turn] - r0);
-[t_asc,U_asc] = ode45(@(t,U) ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0,altPO), ...
-    [t_turn(end), tfin], [U_turn(end,1:3)';V_turn], opts_main);
+[t_stage1,U_stage1] = ode45(@(t,U) ode_main(t,U,mdot0,1,1,T0,A0), ...
+    [t_turn(end), tfin], [U_turn(end,1:3)';V_turn;U_turn(end,7)], opts_stage1);
+
+stage_index = [stage_index;ones(length(t_stage1),1)];
+thrust_index = [thrust_index;T0(1)*ones(length(t_stage1),1)];
+
+if norm(U_stage1(end,1:3))<= RE+1
+    t_stage2_burn1 = [];
+    U_stage2_burn1 = [];
+else
+    t_stagesep = t_stage1(end);
+    [t_stagesep_res,U_stagesep] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
+    [t_stagesep, t_stagesep+tsep], [U_stage1(end,1:3)';U_stage1(end,4:6)';m0(2)], opts_stage2);
+    stage_index = [stage_index;0*ones(length(t_stagesep_res),1)];
+    thrust_index = [thrust_index;0*ones(length(t_stagesep_res),1)];
+
+    t_stage2_start = t_stagesep_res(end);
+
+    [t_stage2_burn1,U_stage2_burn1] = ode45(@(t,U) ode_main(t,U,mdot0,2,1,T0,A0), ...
+    [t_stage2_start, inf], [U_stagesep(end,1:3)';U_stagesep(end,4:6)';U_stagesep(end,7)], opts_stage2);
+    stage_index = [stage_index;2*ones(length(t_stage2_burn1),1)];
+    thrust_index = [thrust_index;T0(2)*ones(length(t_stage2_burn1),1)];
+
+[t_stage2_cruise,U_stage2_cruise] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
+    [t_stage2_burn1(end), inf], [U_stage2_burn1(end,1:3)';U_stage2_burn1(end,4:6)';U_stage2_burn1(end,7)], opts_cruise);
+    stage_index = [stage_index;2*ones(length(t_stage2_cruise),1)];
+    thrust_index = [thrust_index;0*ones(length(t_stage2_cruise),1)];
+    
+    r_trgt = norm(U_stage2_cruise(end,1:3)');
+    V_trgt = sqrt(muE/r_trgt);
+    opts_circularize = odeset('RelTol',1e-10, 'MaxStep',1 , ...
+    'Stats','on', 'Events',@(t,U) circularizecond(t,U,V_trgt,mf(2)));
+[t_stage2_burn2,U_stage2burn2] = ode45(@(t,U) ode_main(t,U,mdot0,2,1,T0,A0), ...
+    [t_stage2_cruise(end), inf], [U_stage2_cruise(end,1:3)';U_stage2_cruise(end,4:6)';U_stage2_cruise(end,7)], opts_circularize);
+    stage_index = [stage_index;2*ones(length(t_stage2_burn2),1)];
+    thrust_index = [thrust_index;T0(2)*ones(length(t_stage2_burn2),1)];
+    
+    opts_stage2.Events = @(t,U)stagecond(t,U,mf,2,inf);
+    [t_stage2_orbit,U_stage2_orbit] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
+    [t_stage2_burn2(end), t_stage2_burn2(end)+180*60], [U_stage2burn2(end,1:3)';U_stage2burn2(end,4:6)';U_stage2burn2(end,7)], opts_stage2);
+    stage_index = [stage_index;2*ones(length(t_stage2_orbit),1)];
+    thrust_index = [thrust_index;0*ones(length(t_stage2_orbit),1)];
+end
 
 % Controlled turn
-t_steerstart = t_asc(end);
-r_asc = U_asc(end, 1:3);
-V_asc = U_asc(end, 4:6);
-gamma0 = gammafunc(r_asc,V_asc);
-[t_steer,U_steer] = ode45(@(t,U) ode_steer(t,U,m0,mdot0,tstage_index,tbo,T0,A0, gamma0,t_steerstart), ...
-    [t_steerstart, tfin], [r_asc';V_asc'], opts_steer);
 
-% Stops control and cruises
-[t_cruise,U_cruise] = ode45(@(t,U) ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0), ...
-    [t_steer(end), tfin], U_steer(end,:), opts_cruise);
-toc % Used to check performance of solvers, can be ignored
-
-% Adds the solution for the segments
-t_main = [t_turn; t_asc;t_steer;t_cruise];
-U_main = [U_turn; U_asc; U_steer;U_cruise];
+t_main = [t_turn; t_stage1; t_stagesep_res; t_stage2_burn1;t_stage2_cruise;t_stage2_burn2;t_stage2_orbit];
+U_main = [U_turn; U_stage1;U_stagesep;U_stage2_burn1;U_stage2_cruise;U_stage2burn2;U_stage2_orbit];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Postprocessing      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -142,14 +180,14 @@ a_res = gradient(Vmag_res,t_main);
 maxr = max(h_res+RE);
 
 gamma = zeros(N,1);  % Flightpath angle
-mres = zeros(N,1);   % Mass as function of time
+mres = U_main(:,7);   % Mass as function of time
 
 Mres = zeros(N,1);   % Mach 
 CDres = zeros(N,1);  % Drag coeff
 rhot = zeros(N,1);
 gres = zeros(N,1);
 A = zeros(N,1);
-Tres = zeros(N,1);
+Tres = thrust_index;
 
 for j = 1:N
     % Lat-Long in ECI
@@ -157,14 +195,20 @@ for j = 1:N
     
     gamma(j) = gammafunc(r_res(j,:),V_res(j,:)); % Flight path angle, measured from horizontal
     
-    [mres(j),Tres(j),A(j),CDres(j)] = statefunc(t_main(j), ... 
-        m0,mdot0,tstage_index,tbo,T0,A0,V_res(j,:),h0);
+    CDres(j) = CD_func(r_res(j,:),V_res(j,:));
     
     Mres(j) = norm(V_res(j,:))/atmos(h_res(j),13);
 
     rhot(j) = atmos(h_res(j),12);
 
     gres(j) = gfunc(h_res(j)+RE);
+    
+    if stage_index(j) == 1
+        A(j) = A0(1);
+    else
+        A(j) = A0(2);
+    end
+
 end
 
 q_R = 0.5*Vmag_res.^2.*rhot;
@@ -180,14 +224,12 @@ delta_V_grav_tot = -trapz(t_main,gres.*cos(gamma*d2r));
 delta_V_air_burn1 = -trapz(t_main(1:i_tbo1), CDres(1:i_tbo1).*A(1:i_tbo1).*q_R(1:i_tbo1)./mres(1:i_tbo1));
 delta_V_grav_burn1 = trapz(t_main(1:i_tbo1), gres(1:i_tbo1).*cos(gamma(1:i_tbo1)*d2r));
 
-delta_V_air_burn2 = -trapz(t_main(i_tbo1+1:i_tbo2), CDres(i_tbo1+1:i_tbo2).*A(i_tbo1+1:i_tbo2).*q_R(i_tbo1+1:i_tbo2)./mres(i_tbo1+1:i_tbo2));
-delta_V_grav_burn2 = trapz(t_main(i_tbo1+1:i_tbo2), gres(i_tbo1+1:i_tbo2).*cos(gamma(i_tbo1+1:i_tbo2)*d2r));
+% delta_V_air_burn2 = -trapz(t_main(i_tbo1+1:i_tbo2), CDres(i_tbo1+1:i_tbo2).*A(i_tbo1+1:i_tbo2).*q_R(i_tbo1+1:i_tbo2)./mres(i_tbo1+1:i_tbo2));
+% delta_V_grav_burn2 = trapz(t_main(i_tbo1+1:i_tbo2), gres(i_tbo1+1:i_tbo2).*cos(gamma(i_tbo1+1:i_tbo2)*d2r));
 
-delta_V_air_burn3 = -trapz(t_main(i_tbo2+1:i_tbo3), CDres(i_tbo2+1:i_tbo3).*A(i_tbo2+1:i_tbo3).*q_R(i_tbo2+1:i_tbo3)./mres(i_tbo2+1:i_tbo3));
-delta_V_grav_burn3 = trapz(t_main(i_tbo2+1:i_tbo3), gres(i_tbo2+1:i_tbo3).*cos(gamma(i_tbo2+1:i_tbo3)*d2r));
 
-delta_V_air_burn = -trapz(t_main(1:i_tbo), CDres(1:i_tbo).*A(1:i_tbo).*q_R(1:i_tbo)./mres(1:i_tbo));
-delta_V_grav_burn = trapz(t_main(1:i_tbo), gres(1:i_tbo).*cos(gamma(1:i_tbo)*d2r));
+% delta_V_air_burn = -trapz(t_main(1:i_tbo), CDres(1:i_tbo).*A(1:i_tbo).*q_R(1:i_tbo)./mres(1:i_tbo));
+% delta_V_grav_burn = trapz(t_main(1:i_tbo), gres(1:i_tbo).*cos(gamma(1:i_tbo)*d2r));
 
 % Uses less points for plotting due to performance
 nf = 100;                   % Number of frames
@@ -217,31 +259,34 @@ end
 %% Figures %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 figure(5)
-subplot(5,1,1)
+subplot(6,1,1)
 plot(t_main,Vmag_res/1e3)
 ylabel('$|V|$ [km/s]')
 xline(tstage_index(:,3))
-xline(t_steerstart, '--')
-subplot(5,1,2)
+xline(t_stage2_start, '--')
+subplot(6,1,2)
 plot(t_main,h_res/1e3)
 ylabel('$|h|$ [km]')
 xline(tstage_index(:,3))
-xline(t_steerstart, '--')
-subplot(5,1,3)
+xline(t_stage2_start, '--')
+subplot(6,1,3)
 plot(t_main,mres/1e3)
 ylabel('$m$ [ton]') 
 xline(tstage_index(:,3))
-xline(t_steerstart, '--')
-subplot(5,1,4)
+xline(t_stage2_start, '--')
+subplot(6,1,4)
 plot(t_main,gamma)
 ylabel('$\gamma$ [$^o$]')
 xline(tstage_index(:,3))
-xline(t_steerstart, '--')
-subplot(5,1,5)
+xline(t_stage2_start, '--')
+subplot(6,1,5)
 plot(t_main, Tres/1e6)
 ylabel('$T$ [MN]')
-xlabel('$t$, [s]')
 xline(tstage_index(:,3))
+subplot(6,1,6)
+plot(t_main,a_res/g0)
+xlabel('$t$, [s]')
+ylabel('$a/g_0$ [-]')
 
 figure(4)
 subplot(2,1,1)
@@ -267,22 +312,22 @@ subplot(6,1,1)
 plot(ttemp,Vmag_res(1:TT)/1e3)
 ylabel('$|V|$ [km/s]')
 xline(tstage_index(:,3))
-xline(t_steerstart, '--')
+xline(t_stage2_start, '--')
 subplot(6,1,2)
 plot(ttemp,h_res(1:TT)/1e3)
 ylabel('$|h|$ [km]')
 xline(tstage_index(:,3))
-xline(t_steerstart, '--')
+xline(t_stage2_start, '--')
 subplot(6,1,3)
 plot(ttemp,mres(1:TT)/1e3)
 ylabel('$m$ [ton]') 
 xline(tstage_index(:,3))
-xline(t_steerstart, '--')
+xline(t_stage2_start, '--')
 subplot(6,1,4)
 plot(ttemp,gamma(1:TT))
 ylabel('$\gamma$ [$^o$]')
 xline(tstage_index(:,3))
-xline(t_steerstart, '--')
+xline(t_stage2_start, '--')
 subplot(6,1,5)
 plot(ttemp, Tres(1:TT)/1e6)
 ylabel('$T$ [MN]')
@@ -373,20 +418,71 @@ toc
 
 
 %% Functions 
-function dUdt = ode_turn(t,U,m0,mdot0,tstage_index,tbo,T0,A0, altPO)
+function dUdt = ode_turn(t,U,mdot0,stage,thrust_bool,T0,A0)
     RE = 6371e3;
 
-    dUdt = zeros(4,1);
+    dUdt = zeros(7,1);
+    m = U(7);
     r = U(1:3);
     V = U(4:6);
     h = norm(r) - RE;
     
     rho = atmos(h,12); 
     
-    [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h);
+    A = A0(stage);
+    mdot = mdot0(stage);
+
+    CD = CD_func(r,V);
+
+    if thrust_bool==0
+        T = 0;
+        dUdt(7) = 0;
+    else
+        T = T0(stage);
+        dUdt(7) = -mdot;
+    end
+
+   
+    rhat = r/norm(r);
+    Vhat = V/norm(V);
+    Vhat(isinf(Vhat)|isnan(Vhat)) = 0;
+
+    g = gfunc(r);
+    if t==0
+        T=T*rhat;
+    else
+        T = T*Vhat;
+    end
+    drag = -0.5*rho * CD * A * norm(V).^2 /m * Vhat;
+    dUdt(1:3) = V ;
+    dUdt(4:6) = T/m + drag/m + g;
+
+end
+
+function dUdt = ode_main(t,U,mdot0,stage,thrust_bool,T0,A0)
+    RE = 6371e3;
+
+    dUdt = zeros(7,1);
+    m = U(7);
+    r = U(1:3);
+    V = U(4:6);
+    h = norm(r) - RE;
     
-    omegaE = [0;0;7.292115855377074e-5];
-    muE = 3.986e5 * (1e3)^3; %m^3/s^2
+    rho = atmos(h,12); 
+    
+    A = A0(stage);
+    mdot = mdot0(stage);
+    CD = CD_func(r,V);
+   if thrust_bool==0
+        T = 0;
+        dUdt(7) = 0;
+    else
+        T = T0(stage);
+        dUdt(7) = -mdot;
+    end
+    
+    omegaE = 0*[0;0;7.292115855377074e-5;];
+
 
 
     rhat = r/norm(r);
@@ -399,13 +495,12 @@ function dUdt = ode_turn(t,U,m0,mdot0,tstage_index,tbo,T0,A0, altPO)
     else
         T = T*Vhat;
     end
-    drag = -0.5*rho * CD * A * (norm(V-cross([0;0;7.292115855377074e-5],r))).^2 /m * Vhat;
-    dUdt(1:3) = V ;
+    drag = -0.5*rho * CD * A * (norm(V)).^2 /m * Vhat;
+    dUdt(1:3) = V + cross(omegaE,r);
     dUdt(4:6) = T/m + drag/m + g;
-
 end
 
-function dUdt = ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0, altPO)
+function dUdt = ode_Toff(t,U,m0,mdot0,tstage_index,tbo,T0,A0,m)
     RE = 6371e3;
 
     dUdt = zeros(4,1);
@@ -415,8 +510,10 @@ function dUdt = ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0, altPO)
     
     rho = atmos(h,12); 
     
-    [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h);
+    [~,~,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h);
     
+    T = 0;
+
     omegaE = 0*[0;0;7.292115855377074e-5;];
     muE = 3.986e5 * (1e3)^3; %m^3/s^2
 
@@ -437,12 +534,15 @@ function dUdt = ode_main(t,U,m0,mdot0,tstage_index,tbo,T0,A0, altPO)
 end
 
 
-function dUdt = ode_steer(t,U,m0,mdot0,tstage_index,tbo,T0,A0, gamma0,t0)
+function dUdt = ode_steer(t,U,mdot0,stage,thrust_bool,T0,A0, gamma0,t0)
     RE = 6371e3;   
     d2r = pi/180;
-    dUdt = zeros(4,1);
+    
+    dUdt = zeros(7,1);
+    
     r = U(1:3);
     Vold = U(4:6);
+    m = U(7);
     h = norm(r) - RE;
     gammaold = gammafunc(r,Vold)*d2r;
     gammaend = 0.8*pi/2;
@@ -456,8 +556,17 @@ function dUdt = ode_steer(t,U,m0,mdot0,tstage_index,tbo,T0,A0, gamma0,t0)
     
     rho = atmos(h,12); 
     
-    [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h);
-    
+    A = A0(stage);
+    mdot = mdot0(stage);
+    CD = CD_func(r,V);
+    if thrust_bool==0
+        T = 0;
+        dUdt(7) = 0;
+    else
+        T = T0(stage);
+        dUdt(7) = -mdot;
+    end
+
     omegaE = 0*[0;0;7.292115855377074e-5;];
     muE = 3.986e5 * (1e3)^3; %m^3/s^2
 
@@ -475,6 +584,7 @@ function dUdt = ode_steer(t,U,m0,mdot0,tstage_index,tbo,T0,A0, gamma0,t0)
     drag = -0.5*rho * CD * A * (norm(V)).^2 /m * Vhat;
     dUdt(1:3) = V + cross(omegaE,r);
     dUdt(4:6) = T/m + drag/m + g;
+    
 end
 
 function Vnew = vecrot(r,Vold,delta)
@@ -493,60 +603,15 @@ function gamma = gammafunc(r,V)
     gamma = real(acosd(CosTheta));
 end
 
-function [m,T,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h)
-    Nstage = length(m0);
-    
+function CD = CD_func(r,V)
+    RE = 6371e3;
+    h = norm(r) - RE; 
     M = norm(V)/atmos(h,13); 
-    % if M < 0.85
-    %     CD = 0.2;
-    % else
-    %     CD = 0.11+0.82/M^2-0.55/M^4;
-    % end
-
-    if M < 0.85
+     if M < 0.85
         CD = 0.2;
     else
         CD = 0.23+0.82/M^2-0.55/M^4;
     end
-
-    % if M < 0.85
-    %     CD = 0.2;
-    % elseif (M>=0.85) && (M<1.25)
-    %     CD = 0.52;
-    % elseif (M>=1.25) && (M<3)
-    %     CD = 0.3;
-    % else
-    %     CD = 0.25;
-    % end
-        % CD = 0.5;
-    stage = 0;
-    for i = 1:Nstage
-        if i==Nstage
-            stage = i;
-            break;
-        elseif t<tstage_index(i+1,2)
-            stage = i;
-            break;
-        end
-    end
-    if t>tstage_index(end,3)
-        m = m0(end) - (tbo(end))*mdot0(end);
-        T = 0;
-        A = A0(end);
-    elseif stage==Nstage
-        m = m0(stage) - mdot0(stage)*(t-tstage_index(stage,2));
-        T = T0(stage);
-        A = A0(stage);
-    elseif t>tstage_index(stage,3) & t<tstage_index(stage+1,2)
-        m = m0(stage+1);
-        T = 0;
-        A = A0(stage+1);
-    else
-        m = m0(stage) - mdot0(stage)*(t-tstage_index(stage,2));
-        T = T0(stage);
-        A = A0(stage);
-    end
-    
 end
 
 function r = latlong2cart(lat,long,h)
@@ -568,6 +633,31 @@ lat = asin(r(3)/rmag)*(180/pi);
         long = atan(r(2)/r(1))*(180/pi) - 180;
     end
 end
+
+function [value,isterminal,direction] = stagecond(t,U,mf0,stage,tstop)
+    RE = 6371e3;
+    m = U(7);
+    r = U(1:3);
+    h = norm(r) - RE;
+    if m <= mf0(stage)
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    elseif h < 0
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    elseif t>=tstop
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    else
+        value = 1;
+        isterminal = 0;
+        direction = 0;
+    end
+end
+
 
 function [value,isterminal,direction] = turncond(t,U,altPO)
     RE = 6371e3;
@@ -606,21 +696,18 @@ function [value,isterminal,direction] = crashcond(t,U)
 
 end
 
-function [value,isterminal,direction] = cruisecond(t,U,stopt)
+function [value,isterminal,direction] = cruisecond(t,U)
     RE = 6371e3;
-
+    d2r = pi/180;
     r = U(1:3);
     V = U(4:6);
-    h = norm(r) - RE;
-    if h < 0
+    h = norm(r)-RE;
+    gamma = gammafunc(r,V)*d2r;
+    if abs(gamma-pi/2) < 0.1*pi/180
         value = 0;
         isterminal = 1;
         direction = 0;
-    % elseif h>500e3
-    %     value = 0;
-    %     isterminal = 1;
-    %     direction = 0;
-    elseif t >= 0.9*stopt
+    elseif h < 0
         value = 0;
         isterminal = 1;
         direction = 0;
@@ -632,6 +719,34 @@ function [value,isterminal,direction] = cruisecond(t,U,stopt)
 
 end
 
+function  [value,isterminal,direction] = circularizecond(t,U,V_trgt,mf)
+    RE = 6371e3;
+    r = U(1:3);
+    V = U(4:6);
+    h = norm(r)-RE;
+    m = U(7);
+
+    if norm(V) >= 1.01*V_trgt
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+        disp('Circularizecond target velocity achived')
+    elseif m <= mf
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    elseif h < 0
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    
+    else
+        value = 1;
+        isterminal = 0;
+        direction = 0;
+    end
+end
+
 function [value,isterminal,direction] = steercond(t,U)
     RE = 6371e3;
 
@@ -640,7 +755,7 @@ function [value,isterminal,direction] = steercond(t,U)
     h = norm(r) - RE;
     gamma = gammafunc(r,V);
 
-    if gamma > 50
+    if gamma > 70
         value = 0;
         isterminal = 1;
         direction = 0;
