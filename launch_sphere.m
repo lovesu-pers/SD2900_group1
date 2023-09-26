@@ -43,14 +43,14 @@ m0     = [518870,97570];                % Initail/fueled mass kg
 massfraction   = [ 0.2374,0.1];        % mf/m0
 mf     = m0.*massfraction;       % Final/empty mass
 mprop = m0-mf;
-T0      = [0.76*(7607e3),981e3];            % Thrust N
+T0      = [(7607e3),981e3];     %0.76*       % Thrust N
 Isp    = [283,348];                 % Specific impulse s
 d      = [3.7,3.7];                   % Diameter m
 tsep   =  1;
-tstop = 400;  % Time when stage 2 should stop burning
+tstop = 310;  % Time when stage 2 should stop burning
 
-altPO  = 500;
-turn_fp = 89.9*d2r;
+altPO  = 45;
+turn_fp = 89.6*d2r;
 turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
         cos(turn_fp)*sin(turn_azi); ...
         sin(turn_fp)];
@@ -123,27 +123,40 @@ else
     thrust_index = [thrust_index;0*ones(length(t_stagesep_res),1)];
 
     t_stage2_start = t_stagesep_res(end);
-
-    [t_stage2_burn1,U_stage2_burn1] = ode45(@(t,U) ode_main(t,U,mdot0,2,1,T0,A0), ...
-    [t_stage2_start, inf], [U_stagesep(end,1:3)';U_stagesep(end,4:6)';U_stagesep(end,7)], opts_stage2);
-    stage_index = [stage_index;2*ones(length(t_stage2_burn1),1)];
-    thrust_index = [thrust_index; T0(2)*ones(length(t_stage2_burn1),1)];
-
-[t_stage2_cruise,U_stage2_cruise] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
-    [t_stage2_burn1(end), inf], [U_stage2_burn1(end,1:3)';U_stage2_burn1(end,4:6)';U_stage2_burn1(end,7)], opts_cruise);
-    stage_index = [stage_index;2*ones(length(t_stage2_cruise),1)];
-    thrust_index = [thrust_index;0*ones(length(t_stage2_cruise),1)];
     
-    r_trgt = norm(U_stage2_cruise(end,1:3)');
-    V_trgt = sqrt(muE/r_trgt);
-    opts_circularize = odeset('RelTol',1e-10, 'MaxStep',1 , ...
-    'Stats','on', 'Events',@(t,U) circularizecond(t,U,V_trgt,mf(2)));
-    [t_stage2_burn2,U_stage2burn2] = ode45(@(t,U) ode_main(t,U,mdot0,2,1,T0,A0), ...
-    [t_stage2_cruise(end), inf], [U_stage2_cruise(end,1:3)'; ...
-    U_stage2_cruise(end,4:6)';U_stage2_cruise(end,7)], opts_circularize);
+    if norm(U_stagesep(end,1:3))>= RE+1
+        [t_stage2_burn1,U_stage2_burn1] = ode45(@(t,U) ode_main(t,U,mdot0,2,1,T0,A0), ...
+        [t_stage2_start, inf], [U_stagesep(end,1:3)';U_stagesep(end,4:6)';U_stagesep(end,7)], opts_stage2);
+         stage_index = [stage_index;2*ones(length(t_stage2_burn1),1)];
+        thrust_index = [thrust_index; T0(2)*ones(length(t_stage2_burn1),1)];
+        if norm(U_stagesep(end,1:3)) >= RE+1
+            [t_stage2_cruise,U_stage2_cruise] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
+            [t_stage2_burn1(end), inf], [U_stage2_burn1(end,1:3)';U_stage2_burn1(end,4:6)';U_stage2_burn1(end,7)], opts_cruise);
+            stage_index = [stage_index;2*ones(length(t_stage2_cruise),1)];
+            thrust_index = [thrust_index;0*ones(length(t_stage2_cruise),1)];
+
+            if norm(U_stage2_cruise(end,1:3)) >= RE+1
+                 r_trgt = norm(U_stage2_cruise(end,1:3)');
+                 V_trgt = sqrt(muE/r_trgt);
+                opts_circularize = odeset('RelTol',1e-10, 'MaxStep',1 , ...
+                'Stats','on', 'Events',@(t,U) circularizecond(t,U,V_trgt,mf(2)));
+                [t_stage2_burn2,U_stage2burn2] = ode45(@(t,U) ode_main(t,U,mdot0,2,1,T0,A0), ...
+                [t_stage2_cruise(end), inf], [U_stage2_cruise(end,1:3)'; ...
+                U_stage2_cruise(end,4:6)';U_stage2_cruise(end,7)], opts_circularize);
+
+                stage_index = [stage_index;2*ones(length(t_stage2_burn2),1)];
+                thrust_index = [thrust_index;T0(2)*ones(length(t_stage2_burn2),1)];
+            end
+        else 
+            t_stage2_cruise = [];
+            U_stage2_cruise = [];
+        end
+    else
+        t_stage2_burn1 = [];
+        U_stage2_burn1 = [];
+    end
     
-    stage_index = [stage_index;2*ones(length(t_stage2_burn2),1)];
-    thrust_index = [thrust_index;T0(2)*ones(length(t_stage2_burn2),1)];
+   
     
     opts_stage2.Events = @(t,U) stagecond(t,U,mf,2,inf);
     [t_stage2_orbit,U_stage2_orbit] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
@@ -704,7 +717,7 @@ function [value,isterminal,direction] = cruisecond(t,U)
     V = U(4:6);
     h = norm(r)-RE;
     gamma = gammafunc(r,V)*d2r;
-    if abs(gamma-pi/2) < 0.1*pi/180
+    if abs(gamma-0.97*pi/2) < 0.1*pi/180
         value = 0;
         isterminal = 1;
         direction = 0;
@@ -727,7 +740,7 @@ function  [value,isterminal,direction] = circularizecond(t,U,V_trgt,mf)
     h = norm(r)-RE;
     m = U(7);
 
-    if norm(V) >= 1.01*V_trgt
+    if norm(V) >= 1.001*V_trgt
         value = 0;
         isterminal = 1;
         direction = 0;
