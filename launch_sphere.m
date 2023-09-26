@@ -43,13 +43,13 @@ turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ROCKET PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Nstage = 3;
-m0     = [2780000,677000,215000];                % Initail/fueled mass kg
-massfraction   = [0.2817,0.3663, 1*0.4930];        % mf/m0
+m0     = [2780000,677000];                % Initail/fueled mass kg
+massfraction   = [0.2817,0.3663];        % mf/m0
 mf     = m0.*massfraction;       % Final/empty mass
 mprop = m0-mf;
-T0      = [33400e3,1.0*4450e3,1.0*2000e3];            % Thrust N
-Isp    = [265,390,421];                 % Specific impulse s
-d      = [10,10,6.6];                   % Diameter m
+T0      = [33400e3,1.0*4450e3];            % Thrust N
+Isp    = [265,390];                 % Specific impulse s
+d      = [10,10];                   % Diameter m
 
 altPO  = 200;
 tsep   =  1;
@@ -61,15 +61,15 @@ tbo = (m0-mf) ./ mdot0;  % Burn time for each stage
 tbo_tot = sum(tbo); % Total burn time for the whole rocket
 i_tbo1 = ceil(tbo(1));
 i_tbo2 = i_tbo1 + ceil(tbo(2));
-i_tbo3 = i_tbo2 + ceil(tbo(3));
+% i_tbo3 = i_tbo2 + ceil(tbo(3));
 i_tbo = ceil(tbo_tot);
 
 DeltaV = -g0*Isp.*log(massfraction);
 DeltaVtot = sum(DeltaV);
 
 tstage_index = [1, 0, tbo(1); 
-                2, tbo(1)+tsep, tbo(2)+tbo(1)+tsep;
-                3, tbo(2)+tbo(1)+2*tsep, tbo(2)+tbo(1)+tbo(3)+2*tsep];       % Stage number, start time, bo-time
+                2, tbo(1)+tsep, tbo(2)+tbo(1)+tsep];
+                %3, tbo(2)+tbo(1)+2*tsep, tbo(2)+tbo(1)+tbo(3)+2*tsep];       % Stage number, start time, bo-time
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ODE solving       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -183,8 +183,8 @@ delta_V_grav_burn1 = trapz(t_main(1:i_tbo1), gres(1:i_tbo1).*cos(gamma(1:i_tbo1)
 delta_V_air_burn2 = -trapz(t_main(i_tbo1+1:i_tbo2), CDres(i_tbo1+1:i_tbo2).*A(i_tbo1+1:i_tbo2).*q_R(i_tbo1+1:i_tbo2)./mres(i_tbo1+1:i_tbo2));
 delta_V_grav_burn2 = trapz(t_main(i_tbo1+1:i_tbo2), gres(i_tbo1+1:i_tbo2).*cos(gamma(i_tbo1+1:i_tbo2)*d2r));
 
-delta_V_air_burn3 = -trapz(t_main(i_tbo2+1:i_tbo3), CDres(i_tbo2+1:i_tbo3).*A(i_tbo2+1:i_tbo3).*q_R(i_tbo2+1:i_tbo3)./mres(i_tbo2+1:i_tbo3));
-delta_V_grav_burn3 = trapz(t_main(i_tbo2+1:i_tbo3), gres(i_tbo2+1:i_tbo3).*cos(gamma(i_tbo2+1:i_tbo3)*d2r));
+% delta_V_air_burn3 = -trapz(t_main(i_tbo2+1:i_tbo3), CDres(i_tbo2+1:i_tbo3).*A(i_tbo2+1:i_tbo3).*q_R(i_tbo2+1:i_tbo3)./mres(i_tbo2+1:i_tbo3));
+% delta_V_grav_burn3 = trapz(t_main(i_tbo2+1:i_tbo3), gres(i_tbo2+1:i_tbo3).*cos(gamma(i_tbo2+1:i_tbo3)*d2r));
 
 delta_V_air_burn = -trapz(t_main(1:i_tbo), CDres(1:i_tbo).*A(1:i_tbo).*q_R(1:i_tbo)./mres(1:i_tbo));
 delta_V_grav_burn = trapz(t_main(1:i_tbo), gres(1:i_tbo).*cos(gamma(1:i_tbo)*d2r));

@@ -92,6 +92,7 @@ H_parking = linspace (100, 600, 26)' * 10^3;
 Mission_info = zeros(size(H_parking,1) + 1, 7);
 
 V_EarthROT = 2 * pi / (T_Earth) * R_Earth;
+R_parking = H_parking(1) + R_Earth;
 
 E0 = -mu/R_Earth;
 Ef = Mission_info(1,2)^2/2 - mu/R_parking;
