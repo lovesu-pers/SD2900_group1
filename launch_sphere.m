@@ -26,8 +26,8 @@ earth_REF = referenceSphere('Earth');
 %% Launch site %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Kourou, French Guiana
 h0 = 2;
-lat0 =5.167713*d2r;
-long0 =-52.683994*d2r;
+lat0 = 5.167713*d2r;
+long0 = -52.683994*d2r;
 r0 = latlong2cart(lat0, long0, h0);
 rmag = norm(r0);
 V0 = [0;0;0];
@@ -44,7 +44,7 @@ massfraction   = [ 0.2374,0.1];        % mf/m0
 mf     = m0.*massfraction;       % Final/empty mass
 mprop = m0-mf;
 T0      = [0.76*(7607e3),981e3];            % Thrust N
-Isp    = [(283+312)/2,348];                 % Specific impulse s
+Isp    = [283,348];                 % Specific impulse s
 d      = [3.7,3.7];                   % Diameter m
 tsep   =  1;
 tstop = 400;  % Time when stage 2 should stop burning
@@ -127,7 +127,7 @@ else
     [t_stage2_burn1,U_stage2_burn1] = ode45(@(t,U) ode_main(t,U,mdot0,2,1,T0,A0), ...
     [t_stage2_start, inf], [U_stagesep(end,1:3)';U_stagesep(end,4:6)';U_stagesep(end,7)], opts_stage2);
     stage_index = [stage_index;2*ones(length(t_stage2_burn1),1)];
-    thrust_index = [thrust_index;T0(2)*ones(length(t_stage2_burn1),1)];
+    thrust_index = [thrust_index; T0(2)*ones(length(t_stage2_burn1),1)];
 
 [t_stage2_cruise,U_stage2_cruise] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
     [t_stage2_burn1(end), inf], [U_stage2_burn1(end,1:3)';U_stage2_burn1(end,4:6)';U_stage2_burn1(end,7)], opts_cruise);
@@ -138,12 +138,14 @@ else
     V_trgt = sqrt(muE/r_trgt);
     opts_circularize = odeset('RelTol',1e-10, 'MaxStep',1 , ...
     'Stats','on', 'Events',@(t,U) circularizecond(t,U,V_trgt,mf(2)));
-[t_stage2_burn2,U_stage2burn2] = ode45(@(t,U) ode_main(t,U,mdot0,2,1,T0,A0), ...
-    [t_stage2_cruise(end), inf], [U_stage2_cruise(end,1:3)';U_stage2_cruise(end,4:6)';U_stage2_cruise(end,7)], opts_circularize);
+    [t_stage2_burn2,U_stage2burn2] = ode45(@(t,U) ode_main(t,U,mdot0,2,1,T0,A0), ...
+    [t_stage2_cruise(end), inf], [U_stage2_cruise(end,1:3)'; ...
+    U_stage2_cruise(end,4:6)';U_stage2_cruise(end,7)], opts_circularize);
+    
     stage_index = [stage_index;2*ones(length(t_stage2_burn2),1)];
     thrust_index = [thrust_index;T0(2)*ones(length(t_stage2_burn2),1)];
     
-    opts_stage2.Events = @(t,U)stagecond(t,U,mf,2,inf);
+    opts_stage2.Events = @(t,U) stagecond(t,U,mf,2,inf);
     [t_stage2_orbit,U_stage2_orbit] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
     [t_stage2_burn2(end), t_stage2_burn2(end)+180*60], [U_stage2burn2(end,1:3)';U_stage2burn2(end,4:6)';U_stage2burn2(end,7)], opts_stage2);
     stage_index = [stage_index;2*ones(length(t_stage2_orbit),1)];
@@ -213,23 +215,20 @@ end
 
 q_R = 0.5*Vmag_res.^2.*rhot;
 
-% Delta V calculations 
-delta_V_air = -cumtrapz(t_main,CDres.*A.*q_R./mres); % Cumulative integral
-delta_V_air_tot = -trapz(t_main,CDres.*A.*q_R./mres);
+% Time span when deltaV losses should be calculated
+t_burn = [t_turn; t_stage1; t_stagesep_res; t_stage2_burn1;t_stage2_cruise;t_stage2_burn2];
+i_burn = length(t_burn);
 
-delta_V_grav = -cumtrapz(t_main,gres.*cos(gamma*d2r));
-delta_V_grav_tot = -trapz(t_main,gres.*cos(gamma*d2r));
+% Delta V calculations 
+air_loss_int = CDres.*A.*q_R./mres;
+g_loss_int = gres.*cos(gamma*d2r);
+delta_V_air = -cumtrapz(t_burn,air_loss_int(1:i_burn)); % Cumulative integral
+delta_V_air_tot = -trapz(t_burn,air_loss_int(1:i_burn));
+
+delta_V_grav = -cumtrapz(t_burn,g_loss_int(1:i_burn));
+delta_V_grav_tot = -trapz(t_burn,g_loss_int(1:i_burn));
 
 % Losses are only accounted for during burn time
-delta_V_air_burn1 = -trapz(t_main(1:i_tbo1), CDres(1:i_tbo1).*A(1:i_tbo1).*q_R(1:i_tbo1)./mres(1:i_tbo1));
-delta_V_grav_burn1 = trapz(t_main(1:i_tbo1), gres(1:i_tbo1).*cos(gamma(1:i_tbo1)*d2r));
-
-% delta_V_air_burn2 = -trapz(t_main(i_tbo1+1:i_tbo2), CDres(i_tbo1+1:i_tbo2).*A(i_tbo1+1:i_tbo2).*q_R(i_tbo1+1:i_tbo2)./mres(i_tbo1+1:i_tbo2));
-% delta_V_grav_burn2 = trapz(t_main(i_tbo1+1:i_tbo2), gres(i_tbo1+1:i_tbo2).*cos(gamma(i_tbo1+1:i_tbo2)*d2r));
-
-
-% delta_V_air_burn = -trapz(t_main(1:i_tbo), CDres(1:i_tbo).*A(1:i_tbo).*q_R(1:i_tbo)./mres(1:i_tbo));
-% delta_V_grav_burn = trapz(t_main(1:i_tbo), gres(1:i_tbo).*cos(gamma(1:i_tbo)*d2r));
 
 % Uses less points for plotting due to performance
 nf = 100;                   % Number of frames
@@ -256,8 +255,8 @@ for k = 1:nf
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Figures %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+%% Figures %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+gamma = 90-gamma;
 figure(5)
 subplot(6,1,1)
 plot(t_main,Vmag_res/1e3)
@@ -358,7 +357,9 @@ ylabel('$M$ [-]')
 xlim([0,600])
 
 figure(202)
-plot(t_main, delta_V_grav   )
+plot(t_burn, delta_V_grav   )
+xlabel('$t$ [s]')
+ylabel('Cumulative $\Delta V_{\mathrm{grav}}$ [km/s]')
 
 f1 = figure(1);
 ax1 = gca;
