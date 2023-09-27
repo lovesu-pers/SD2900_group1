@@ -31,26 +31,27 @@ long0 = -52.683994*d2r;
 r0 = latlong2cart(lat0, long0, h0);
 rmag = norm(r0);
 V0 = [0;0;0];
-VErot = cross([0;0;muE],r0);
+
 turn_azi = (90 - 26.6821)*d2r;
 
-
+addrot = 1; % Set to 1 if the velocity from earth's rotation %
+            % should be added 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ROCKET PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Nstage = 2;
-m0     = [130000,27000]%[219948,41188];                % Initail/fueled mass kg
-massfraction   = [0.0792, 0.1444]%[ 0.2804,0.1];        % mf/m0
+m0     = [7.5384e4,7.9259e3];                % Initail/fueled mass kg
+massfraction   = [0.1678,0.1873];        % mf/m0
 mf     = m0.*massfraction;       % Final/empty mass
 mprop = m0-mf;
-T0      = [1500e3, 294e3];     %0.76*       % Thrust N
-Isp    = [292, 359];%[248,330];                 % Specific impulse s
-d      = [3,3];%[3.7,3.7];                   % Diameter m
+T0      = [813e3, 85e3];     %0.76*       % Thrust N
+Isp    = [260,350];                 % Specific impulse s
+d      = [3,3];                   % Diameter m
 tsep   =  1;
-tstop = 250;  % Time when stage 2 should stop burning
+tstop = 350;  % Time when stage 2 should stop burning
 
-altPO  = 100;
-turn_fp = 89.99*d2r;
+altPO  = 450;
+turn_fp = 89.9*d2r;
 turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
         cos(turn_fp)*sin(turn_azi); ...
         sin(turn_fp)];
@@ -70,8 +71,7 @@ i_tbo = ceil(tbo_tot);
 DeltaV = -g0*Isp.*log(massfraction);
 DeltaVtot = sum(DeltaV);
 
-tstage_index = [1, 0, tbo(1); 
-                2, tbo(1)+tsep, tbo(2)+tbo(1)+tsep];
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ODE solving       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -104,7 +104,7 @@ thrust_index = T0(1)*ones(length(t_turn),1);
 
 % Normal gravity turn stage 1
 timeatturn = t_turn(end);
-Vatturn = norm(U_turn(end,4:6));
+Vatturn = norm(U_turn(end,4:6))
 V_turn = norm(U_turn(end,4:6)) * ([X_turn; Y_turn; Z_turn] - r0);
 [t_stage1,U_stage1] = ode45(@(t,U) ode_main(t,U,mdot0,1,1,T0,A0), ...
     [t_turn(end), tfin], [U_turn(end,1:3)';V_turn;U_turn(end,7)], opts_stage1);
@@ -131,7 +131,7 @@ else
         thrust_index = [thrust_index; T0(2)*ones(length(t_stage2_burn1),1)];
         if norm(U_stagesep(end,1:3)) >= RE+1
             [t_stage2_cruise,U_stage2_cruise] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
-            [t_stage2_burn1(end), inf], [U_stage2_burn1(end,1:3)';U_stage2_burn1(end,4:6)';U_stage2_burn1(end,7)], opts_cruise);
+            [t_stage2_burn1(end), inf], [U_stage2_burn1(end,1:3)';U_stage2_burn1(end,4:6)'+addrot*cross(omegaE,r0);U_stage2_burn1(end,7)], opts_cruise);
             stage_index = [stage_index;2*ones(length(t_stage2_cruise),1)];
             thrust_index = [thrust_index;0*ones(length(t_stage2_cruise),1)];
 
@@ -224,7 +224,7 @@ for j = 1:N
     % Lat-Long in ECI
     [latlong_res(j,1), latlong_res(j,2)] = cart2latlong(r_res(j,:));
     
-    gamma(j) = gammafunc(r_res(j,:),V_res(j,:)); % Flight path angle, measured from horizontal
+    gamma(j) = gammafunc(r_res(j,:),V_res(j,:)); 
     
     CDres(j) = CD_func(r_res(j,:),V_res(j,:));
     
@@ -232,8 +232,8 @@ for j = 1:N
 
     rhot(j) = atmos(h_res(j),12);
 
-    gres(j) = gfunc(h_res(j)+RE);
-    
+    gres(j) = -norm(gfunc(r_res(j,:)));
+    j
     if stage_index(j) == 1
         A(j) = A0(1);
     else
@@ -250,7 +250,7 @@ i_burn = length(t_burn);
 
 % Delta V calculations 
 air_loss_int = CDres.*A.*q_R./mres;
-g_loss_int = gres.*cos(gamma*d2r);
+g_loss_int = gres.*sin(gamma*d2r);
 delta_V_air = -cumtrapz(t_burn,air_loss_int(1:i_burn)); % Cumulative integral
 delta_V_air_tot = -trapz(t_burn,air_loss_int(1:i_burn));
 
@@ -282,10 +282,20 @@ for k = 1:nf
     latlong_ecef(k,2) = lla(2);
     disp(['ECEF-calc step: ', num2str(k), ' of ', num2str(nf)])
 end
+%%
+mp_curr = U_main(end,7);
+
+DeltaVman1 = 194.2;
+DeltaVman2 = 190;
+
+man1 = mp_curr * ( 1 - exp( DeltaVman1 / ( Isp(2) * g0 ) )  )
+man2 = (mp_curr+man1) * ( 1 - exp( DeltaVman2 / ( Isp(2) * g0 ) )  )
+
+sparefuel = (mp_curr+man1+man2)-mf(2)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Figures %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-gamma = 90-gamma;
+
 figure(5)
 subplot(6,1,1)
 plot(t_main,Vmag_res/1e3)
@@ -315,6 +325,7 @@ subplot(6,1,6)
 plot(t_main,a_res/g0)
 xlabel('$t$, [s]')
 ylabel('$a/g_0$ [-]')
+ylim([-1,10])
 
 figure(4)
 subplot(2,1,1)
@@ -332,7 +343,7 @@ hold off
 xlabel('$t$, [s]')
 ylabel('long [$^o$]')
 
-ttemp = (find(t_main<1.1*tstage_index(end,3)));
+ttemp = (find(t_main<1.1*t_stage2_burn2(end)));
 ttemp = t_main(1:ttemp(end));
 TT = length(ttemp);
 figure(6)
@@ -363,13 +374,14 @@ subplot(6,1,6)
 plot(ttemp,a_res(1:TT)/g0)
 xlabel('$t$, [s]')
 ylabel('$a/g_0$ [-]')
+ylim([-1,10])
 xline(t_events)
 
 figure(7)
 plot(ttemp,q_R(1:TT)/1e3)
 xlabel('$t$, [s]')
 ylabel('Dynamic pressure $q$ [kPa]')
-xline(tstage_index(:,3))
+
 
 figure(200)
 geoscatter(latlong_ecef(:,1), latlong_ecef(:,2) )
@@ -623,13 +635,24 @@ end
 
 function g =  gfunc(r)
     muE = 3.986e5 * (1e3)^3;
-    g = - muE/norm(r).^3 .* r;
+    J2 = 1.08262668e-3;
+
+    x = r(1);
+    y = r(2);
+    z = r(3);
+
+    R = norm(r);
+    k_g = -muE/R^3;
+    k_xy = k_g*(1+1.5*J2*(1-5*(z/R)^2)/R^2 );
+    k_prim = k_g*(1+1.5*J2*(3-5*(z/R)^2)/R^2 );
+
+    g = [k_xy*x; k_xy*y; k_prim*z];
 end
 
 
 function gamma = gammafunc(r,V)
     CosTheta = max(min(dot(r,V)/(norm(r)*norm(V)),1),-1);
-    gamma = real(acosd(CosTheta));
+    gamma = 90 - real(acosd(CosTheta));
 end
 
 function CD = CD_func(r,V)
@@ -731,8 +754,8 @@ function [value,isterminal,direction] = cruisecond(t,U)
     r = U(1:3);
     V = U(4:6);
     h = norm(r)-RE;
-    gamma = gammafunc(r,V)*d2r;
-    if abs(gamma-0.97*pi/2) < 0.1*pi/180
+    gamma = gammafunc(r,V);
+    if abs(gamma-2.7) < 0.1
         value = 0;
         isterminal = 1;
         direction = 0;
