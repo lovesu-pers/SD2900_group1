@@ -88,6 +88,7 @@ end
 
 %% MISSION ITERATIONS
 H_parking = linspace (100, 600, 26)' * 10^3;
+R_parking = H_parking(1) + R_Earth;
 
 Mission_info = zeros(size(H_parking,1) + 1, 7);
 
@@ -153,4 +154,88 @@ FS_header = '%-6s %-10s %-10s %-10s %-10s %-10s %-10s\r\n';
 fprintf(fileID, FS_header, 'H', 'V', 'Delta_V', 'Delta_Vt1', 'Delta_Vt2', 'Delta_VtT', 'Delta_VTOT');
 FS_data = '%-6.0f %-.4e %-.4e %-.4e %-.4e %-.4e %-.4e \r\n';
 fprintf(fileID, FS_data, A);
+
+%% Actually useful stuff
+% Speed difference
+Speed_diff_F9 = V_target/Delta_Vtot_F9;
+% 40% less propellant mass and structural mass
+mp1 = (1-0.6) * mp1_F9;
+mp2 = (1-0.6) * mp2_F9;
+ms1 = (1-0.8) * ms1_F9;
+ms2 = (1-0.8) * ms2_F9;
+
+mf1 = ms1 + ms2 + mp2 + mPL;
+mf2 = mPL + ms2;
+m01 = mp1 + ms1 + mp2 + ms2 + mPL;
+m02 = ms2 + mp2 + mPL;
+
+% I assume the Isp to be the same of Falcon 9
+% Isp1 = Isp_1_F9;
+% Isp2 = Isp_2_F9;
+
+%
+Isp1 = 235;
+Isp2 = 330;
+
+% Calculation of the Delta_V we can get with this
+Delta_V1_rocket = Isp1 * g0 * log(m01/mf1);
+Delta_V2_rocket = Isp2 * g0 * log(m02/mf2);
+
+Delta_V_rocket = Delta_V1_rocket + Delta_V2_rocket;
+%% Nominal characteristics Falcon 9 (again)
+mPL_F9 = 22800;
+
+m01_F9_nom = ms1_F9 + ms2_F9 + mp1_F9 + mp2_F9 + mPL_F9;
+mf1_F9_nom = ms1_F9 + ms2_F9 + mp2_F9 + mPL_F9;
+m02_F9_nom = ms2_F9 + mp2_F9 + mPL_F9;
+mf2_F9_nom = ms2_F9 + mPL_F9;
+
+mu1_F9 = mf1_F9_nom / m01_F9_nom;
+mu2_F9 = mf2_F9_nom / m02_F9_nom;
+
+SR1_F9 = ms1_F9/m01_F9_nom;
+SR2_F9 = ms2_F9/m02_F9_nom;
+
+
+%% Applied to Miura 5
+m01_M5 = 68742 - 900;
+mf1_M5 = mu1_F9 * m01_M5;
+
+ms1_M5 = SR1_F9 * m01_M5;
+m02_M5 = mf1_M5 - ms1_M5;
+mf2_M5 = m02_M5 * mu2_F9;
+ms2_M5 = SR2_F9 * m02_M5;
+mPL_M5_calc = mf2_M5 - ms2_M5;
+
+mp1_M5 = m01_M5 - mf1_M5;
+mp2_M5 = m02_M5 - mf2_M5;
+
+PL_rate = mPL/mPL_M5_calc;
+ms1_M5 + ms2_M5 + mp1_M5 + mp2_M5 + mPL
+
+% Now I calculate the rocket parameters again, taking into account that the
+% Miura is "supposed" to be able to carry nearly three times the mass that
+% is required from us.
+
+mp1 = 0.2 * mp1_M5;
+mp2 = 0.2 * mp2_M5;
+
+ms1 = 0.1 * ms1_M5;
+ms2 = 0.1 * ms2_M5;
+
+% Calculation of Isp of the two stages bc it is not given to us:
+tbo1_M5 = 182;
+tbo2_M5 = 420;
+T1_M5_TOT = 950*10^3; % Total thrust for 5 TEPREL-C regular engines
+T1_M5 = T1_M5_TOT/5;
+T2_M5 = 50*10^3; % One TEPREL-C vacuum optimized engine
+
+m_dot1_M5 = (mp1_M5/5)/tbo1_M5; % Assuming all five rockets are the same and consume the same
+m_dot2_M5 = mp2_M5/tbo2_M5;
+
+Isp1 = (T1_M5/m_dot1_M5)/g0;
+Isp2 = (T2_M5/m_dot2_M5)/g0;
+%THIS IS NOT CORRECT. CHECK
+
+
 
