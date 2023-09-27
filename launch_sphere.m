@@ -39,25 +39,25 @@ turn_azi = (90 - 26.6821)*d2r;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ROCKET PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Nstage = 2;
-m0     = [518870,97570];                % Initail/fueled mass kg
-massfraction   = [ 0.2374,0.1];        % mf/m0
+m0     = [130000,27000]%[219948,41188];                % Initail/fueled mass kg
+massfraction   = [0.0792, 0.1444]%[ 0.2804,0.1];        % mf/m0
 mf     = m0.*massfraction;       % Final/empty mass
 mprop = m0-mf;
-T0      = [(7607e3),981e3];     %0.76*       % Thrust N
-Isp    = [283,348];                 % Specific impulse s
-d      = [3.7,3.7];                   % Diameter m
+T0      = [1500e3, 294e3];     %0.76*       % Thrust N
+Isp    = [292, 359];%[248,330];                 % Specific impulse s
+d      = [3,3];%[3.7,3.7];                   % Diameter m
 tsep   =  1;
-tstop = 310;  % Time when stage 2 should stop burning
+tstop = 250;  % Time when stage 2 should stop burning
 
-altPO  = 45;
-turn_fp = 89.6*d2r;
+altPO  = 100;
+turn_fp = 89.99*d2r;
 turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
         cos(turn_fp)*sin(turn_azi); ...
         sin(turn_fp)];
 [X_turn, Y_turn, Z_turn] = enu2ecef(turnvec(1),turnvec(2),turnvec(3), ... 
     lat0,long0,h0,earth_REF,"radians");
 
-TW = T0./(g0*m0);
+TW = T0./(g0*m0)
 
 A0     = pi*(d./2).^2; 
 mdot0 = T0./(g0*Isp);
@@ -146,6 +146,20 @@ else
 
                 stage_index = [stage_index;2*ones(length(t_stage2_burn2),1)];
                 thrust_index = [thrust_index;T0(2)*ones(length(t_stage2_burn2),1)];
+                
+                if norm(U_stage2burn2(end,1:3)) > RE + 1
+                 opts_stage2.Events = @(t,U) stagecond(t,U,mf,2,inf);
+                 [t_stage2_orbit,U_stage2_orbit] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
+                [t_stage2_burn2(end), t_stage2_burn2(end)+180*60], [U_stage2burn2(end,1:3)';U_stage2burn2(end,4:6)';U_stage2burn2(end,7)], opts_stage2);
+                stage_index = [stage_index;2*ones(length(t_stage2_orbit),1)];
+                thrust_index = [thrust_index;0*ones(length(t_stage2_orbit),1)];
+                else
+                    t_stage2_orbit = [];
+                    U_stage2_orbit = [];
+                end
+            else
+                t_stage2_burn2 = [];
+                U_stage2burn2 = [];
             end
         else 
             t_stage2_cruise = [];
@@ -158,11 +172,7 @@ else
     
    
     
-    opts_stage2.Events = @(t,U) stagecond(t,U,mf,2,inf);
-    [t_stage2_orbit,U_stage2_orbit] = ode45(@(t,U) ode_main(t,U,mdot0,2,0,T0,A0), ...
-    [t_stage2_burn2(end), t_stage2_burn2(end)+180*60], [U_stage2burn2(end,1:3)';U_stage2burn2(end,4:6)';U_stage2burn2(end,7)], opts_stage2);
-    stage_index = [stage_index;2*ones(length(t_stage2_orbit),1)];
-    thrust_index = [thrust_index;0*ones(length(t_stage2_orbit),1)];
+   
 end
 
 % Controlled turn
@@ -177,6 +187,12 @@ N = length(t_main);
 % Date used to convert between ECI and ECEF
 tt = [2000 1 1 17 15 10];
 epoch = datetime(2000,1,1,17,15,10);
+
+t_stage1_bo = t_stage1(end);
+t_stage2_cutoff = t_stage2_burn1(end);
+t_stage2_relight = t_stage2_burn2(1);
+t_stage2_bo = t_stage2_burn2(end);
+t_events = [t_stage1_bo t_stage2_cutoff t_stage2_relight t_stage2_bo];
 
 dt = zeros(N,1);
 for k = 2:N
@@ -274,27 +290,27 @@ figure(5)
 subplot(6,1,1)
 plot(t_main,Vmag_res/1e3)
 ylabel('$|V|$ [km/s]')
-xline(tstage_index(:,3))
-xline(t_stage2_start, '--')
+xline(t_events)
+
 subplot(6,1,2)
 plot(t_main,h_res/1e3)
 ylabel('$|h|$ [km]')
-xline(tstage_index(:,3))
-xline(t_stage2_start, '--')
+xline(t_events)
+
 subplot(6,1,3)
 plot(t_main,mres/1e3)
 ylabel('$m$ [ton]') 
-xline(tstage_index(:,3))
-xline(t_stage2_start, '--')
+xline(t_events)
+
 subplot(6,1,4)
 plot(t_main,gamma)
 ylabel('$\gamma$ [$^o$]')
-xline(tstage_index(:,3))
-xline(t_stage2_start, '--')
+xline(t_events)
+
 subplot(6,1,5)
 plot(t_main, Tres/1e6)
 ylabel('$T$ [MN]')
-xline(tstage_index(:,3))
+xline(t_events)
 subplot(6,1,6)
 plot(t_main,a_res/g0)
 xlabel('$t$, [s]')
@@ -323,32 +339,31 @@ figure(6)
 subplot(6,1,1)
 plot(ttemp,Vmag_res(1:TT)/1e3)
 ylabel('$|V|$ [km/s]')
-xline(tstage_index(:,3))
-xline(t_stage2_start, '--')
+xline(t_events)
+
 subplot(6,1,2)
 plot(ttemp,h_res(1:TT)/1e3)
 ylabel('$|h|$ [km]')
-xline(tstage_index(:,3))
-xline(t_stage2_start, '--')
+xline(t_events)
+
 subplot(6,1,3)
 plot(ttemp,mres(1:TT)/1e3)
 ylabel('$m$ [ton]') 
-xline(tstage_index(:,3))
-xline(t_stage2_start, '--')
+xline(t_events)
+
 subplot(6,1,4)
 plot(ttemp,gamma(1:TT))
 ylabel('$\gamma$ [$^o$]')
-xline(tstage_index(:,3))
-xline(t_stage2_start, '--')
+xline(t_events)
 subplot(6,1,5)
 plot(ttemp, Tres(1:TT)/1e6)
 ylabel('$T$ [MN]')
-xline(tstage_index(:,3))
+xline(t_events)
 subplot(6,1,6)
 plot(ttemp,a_res(1:TT)/g0)
 xlabel('$t$, [s]')
 ylabel('$a/g_0$ [-]')
-xline(tstage_index(:,3))
+xline(t_events)
 
 figure(7)
 plot(ttemp,q_R(1:TT)/1e3)
