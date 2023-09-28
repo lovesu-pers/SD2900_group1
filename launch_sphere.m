@@ -40,13 +40,18 @@ addrot = 1; % Set to 1 if the velocity from earth's rotation %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ROCKET PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Nstage = 2;
-m0     = [7.5384e4,7.9259e3];                % Initail/fueled mass kg
-massfraction   = [0.1678,0.1873];        % mf/m0
+% m0     = [7.5384e4,7.9259e3];                % Initail/fueled mass kg
+m0     = [6.9e4,8.502e3];                % Initail/fueled mass kg
+% massfraction   = [0.1678,0.1873];        % mf/m0
+massfraction   = [0.18,0.22];        % mf/m0
 mf     = m0.*massfraction;       % Final/empty mass
 mprop = m0-mf;
-T0      = [813e3, 85e3];     %0.76*       % Thrust N
-Isp    = [260,350];                 % Specific impulse s
-d      = [3,3];                   % Diameter m
+% T0      = [813e3, 85e3];     %0.76*       % Thrust N
+T0      = [950e3, 50e3];     %0.76*       % Thrust N
+% Isp    = [260,350];                 % Specific impulse s
+Isp    = [308,343];                 % Specific impulse s
+% d      = [3,3];                   % Diameter m
+d      = [2,2];                   % Diameter m
 tsep   =  1;
 tstop = 350;  % Time when stage 2 should stop burning
 
