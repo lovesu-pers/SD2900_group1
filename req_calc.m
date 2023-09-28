@@ -198,20 +198,19 @@ SR2_F9 = ms2_F9/m02_F9_nom;
 
 
 %% Applied to Miura 5
-m01_M5 = 68742 - 900;
-mf1_M5 = mu1_F9 * m01_M5;
-
-ms1_M5 = SR1_F9 * m01_M5;
+m01_M5 = 68742;
+mf1_M5 = 0.167 * m01_M5;
+ms1_M5 = (SR1_F9+0.009) * m01_M5;
 m02_M5 = mf1_M5 - ms1_M5;
-mf2_M5 = m02_M5 * mu2_F9;
-ms2_M5 = SR2_F9 * m02_M5;
+mf2_M5 = m02_M5 * (0.18);
+ms2_M5 = (SR2_F9+0.029) * m02_M5;
 mPL_M5_calc = mf2_M5 - ms2_M5;
 
 mp1_M5 = m01_M5 - mf1_M5;
 mp2_M5 = m02_M5 - mf2_M5;
 
-PL_rate = mPL/mPL_M5_calc;
-ms1_M5 + ms2_M5 + mp1_M5 + mp2_M5 + mPL
+% PL_rate = mPL/mPL_M5_calc;
+ms1_M5 + ms2_M5 + mp1_M5 + mp2_M5 + mPL;
 
 % Now I calculate the rocket parameters again, taking into account that the
 % Miura is "supposed" to be able to carry nearly three times the mass that
@@ -235,7 +234,9 @@ m_dot2_M5 = mp2_M5/tbo2_M5;
 
 Isp1 = (T1_M5/m_dot1_M5)/g0;
 Isp2 = (T2_M5/m_dot2_M5)/g0;
-%THIS IS NOT CORRECT. CHECK
 
+Delta_V1 = Isp1 * g0 * log(m01_M5/mf1_M5);
+Delta_V2 = Isp2 * g0 * log(m02_M5/mf2_M5);
+Delta_Vtot = Delta_V1 + Delta_V1;
 
 

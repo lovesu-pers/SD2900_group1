@@ -75,10 +75,10 @@ mp1 = m01-mf1;      % Propellant mass first stage
 ms1 = 3900;         % Chosen based on other rockets
 
 % Second stage:
-m02 = mf1 - ms1;    % Initial mass second stage
-mf2 = mu2 * m02;    % Final mass second stage
-mp2 = m02-mf2;      % Propellant mass second stage
-ms2 = mf2 - mPL;    % Structural mass second stage
+m02 = mf1 - ms1;    
+mf2 = mu2 * m02;
+mp2 = m02-mf2;
+ms2 = mf2 - mPL;
 
 % % Verification of the total mass
 % MTOT = mp1 + ms1 + ms2 + mp2 + mPL;
