@@ -53,10 +53,10 @@ Isp    = [308,343];                 % Specific impulse s
 % d      = [3,3];                   % Diameter m
 d      = [2,2];                   % Diameter m
 tsep   =  1;
-tstop = 350;  % Time when stage 2 should stop burning
+tstop = 450;  % Time when stage 2 should stop burning
 
-altPO  = 450;
-turn_fp = 89.9*d2r;
+altPO  = 100;
+turn_fp = 89.7*d2r;
 turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
         cos(turn_fp)*sin(turn_azi); ...
         sin(turn_fp)];
