@@ -41,22 +41,24 @@ addrot = 1; % Set to 1 if the velocity from earth's rotation %
 %% ROCKET PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Nstage = 2;
 % m0     = [7.5384e4,7.9259e3];                % Initail/fueled mass kg
-m0     = [6.9e4,8.502e3];                % Initail/fueled mass kg
+% m0     = [6.9e4,7.53e3];                % Initail/fueled mass kg
+m0     = [3.8309e4,5.6501e3];                % Initail/fueled mass kg
 % massfraction   = [0.1678,0.1873];        % mf/m0
-massfraction   = [0.17,0.18];        % mf/m0
+% massfraction   = [0.17,0.18];        % mf/m0
+massfraction   = [0.2072,0.2181];        % mf/m0
 mf     = m0.*massfraction;       % Final/empty mass
 mprop = m0-mf;
 % T0      = [813e3, 85e3];     %0.76*       % Thrust N
-T0      = [950e3, 50e3];     %0.76*       % Thrust N
+T0      = [760e3, 50e3];     %0.76*       % Thrust N
 % Isp    = [260,350];                 % Specific impulse s
 Isp    = [308,363];                 % Specific impulse s
 % d      = [3,3];                   % Diameter m
 d      = [2,2];                   % Diameter m
 tsep   =  1;
-tstop = 450;  % Time when stage 2 should stop burning
+tstop = 230;  % Time when stage 2 should stop burning
 
-altPO  = 100;
-turn_fp = 89.7*d2r;
+altPO  = 9;
+turn_fp = 87.9*d2r;
 turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
         cos(turn_fp)*sin(turn_azi); ...
         sin(turn_fp)];
@@ -760,7 +762,7 @@ function [value,isterminal,direction] = cruisecond(t,U)
     V = U(4:6);
     h = norm(r)-RE;
     gamma = gammafunc(r,V);
-    if abs(gamma-2.7) < 0.1
+    if abs(gamma-4.5) < 0.1
         value = 0;
         isterminal = 1;
         direction = 0;

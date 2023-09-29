@@ -8,7 +8,7 @@ r2d = 180/pi;
 mu = 3.986e5 * (1e3)^3;
 omega = [0;0;7.292115855377074e-5;];
 RE = 6371e3;
-g0 = 9.81;
+g0 = 9.8;
 
 h0 = 2;
 lat0 = 5.167713*d2r;
@@ -17,7 +17,7 @@ r0 = latlong2cart(lat0, long0, h0);
 
 
 h_target = 1000e3;
-h_park = 400e3;
+h_park = 287e3;
 
 
 dV_grav = 2500;

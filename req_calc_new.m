@@ -75,7 +75,7 @@ mu2 = 0.18;         % Mass ratio second stage
 % First stage:
 mf1 = mu1 * m01;    % Final mass first stage
 mp1 = m01-mf1;      % Propellant mass first stage
-ms1 = 3900;         % Chosen based on other rockets
+ms1 = 4200;         % Chosen based on other rockets
 
 % Second stage:
 m02 = mf1 - ms1;    % Initial mass second stage
