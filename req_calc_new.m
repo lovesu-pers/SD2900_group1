@@ -30,6 +30,8 @@ mf2_F9 = m02_F9 - mp2_F9;                               % Final mass second stag
 
 % mu1_F9 = mf1_F9 / m01_F9;
 % mu2_F9 = mf2_F9 / m02_F9;
+epsilon1_F9 = ms1_F9/(ms1_F9+mp1_F9); 
+epsilon2_F9 = ms2_F9/(ms2_F9+mp2_F9); 
 
 SR1_F9 = ms1_F9/m01_F9; %"Structural ratio" first stage
 SR2_F9 = ms2_F9/m02_F9; %"Structural ratio" second stage
@@ -41,12 +43,13 @@ SR2_F9 = ms2_F9/m02_F9; %"Structural ratio" second stage
 % Second option (more "complex" one): Use both TEPREL-C as the Miura
 m01_M5 = 68742;                     % Initial mass Miura 5 (from website)
 mf1_M5 = 0.167 * m01_M5;            % Final mass first stage
-ms1_M5 = (SR1_F9+0.009) * m01_M5;   % Structural mass first stage
+% ms1_M5 = (SR1_F9+0.009) * m01_M5;   % Structural mass first stage
+ms1_M5 = (SR1_F9+0.015) * m01_M5;
 mp1_M5 = m01_M5 - mf1_M5;           % Propellant mass first stage
 
 m02_M5 = mf1_M5 - ms1_M5;           % Initial mass second stage
 mf2_M5 = m02_M5 * (0.18);           % Final mass second stage
-ms2_M5 = (SR2_F9+0.029) * m02_M5;   % Structural mass second stage
+ms2_M5 = (SR2_F9+0.0222) * m02_M5;   % Structural mass second stage
 mp2_M5 = m02_M5 - mf2_M5;           % Propellant mass second stage
 
 mPL_M5_calc = mf2_M5 - ms2_M5;      % Nominal payload of Miura 5 900kg to LEO
@@ -66,8 +69,8 @@ Isp2 = (T2_M5/m_dot2_M5)/g0;        % Isp TEPREL-C vacuum
 %% Preliminary mass calculations
 m01 = 69000;        % Initial mass estimation        
 
-mu1 = 0.18;         % Mass ratio first stage
-mu2 = 0.22;         % Mass ratio second stage
+mu1 = 0.17;         % Mass ratio first stage
+mu2 = 0.18;         % Mass ratio second stage
 
 % First stage:
 mf1 = mu1 * m01;    % Final mass first stage
@@ -80,6 +83,8 @@ mf2 = mu2 * m02;    % Final mass second stage
 mp2 = m02-mf2;      % Propellant mass second stage
 ms2 = mf2 - mPL;    % Structural mass second stage
 
+epsilon1 = ms1/(ms1 + mp1);
+epsilon2 = ms2/(ms2 + mp2);
 % % Verification of the total mass
 % MTOT = mp1 + ms1 + ms2 + mp2 + mPL;
 % Error = abs(MTOT - m01)/m01 * 100;
