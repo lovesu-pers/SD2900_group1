@@ -57,7 +57,7 @@ d      = [2,2];                   % Diameter m
 tsep   =  1;
 tstop = 230;  % Time when stage 2 should stop burning
 
-altPO  = 9;
+altPO  = 10;
 turn_fp = 87.9*d2r;
 turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
         cos(turn_fp)*sin(turn_azi); ...
@@ -501,7 +501,7 @@ function dUdt = ode_turn(t,U,mdot0,stage,thrust_bool,T0,A0)
     else
         T = T*Vhat;
     end
-    drag = -0.5*rho * CD * A * norm(V).^2 /m * Vhat;
+    drag = -0.5*rho * CD * A * norm(V).^2 * Vhat;
     dUdt(1:3) = V ;
     dUdt(4:6) = T/m + drag/m + g;
 
@@ -543,96 +543,9 @@ function dUdt = ode_main(t,U,mdot0,stage,thrust_bool,T0,A0)
     else
         T = T*Vhat;
     end
-    drag = -0.5*rho * CD * A * (norm(V)).^2 /m * Vhat;
+    drag = -0.5*rho * CD * A * (norm(V)).^2 * Vhat;
     dUdt(1:3) = V + cross(omegaE,r);
     dUdt(4:6) = T/m + drag/m + g;
-end
-
-function dUdt = ode_Toff(t,U,m0,mdot0,tstage_index,tbo,T0,A0,m)
-    RE = 6371e3;
-
-    dUdt = zeros(4,1);
-    r = U(1:3);
-    V = U(4:6);
-    h = norm(r) - RE;
-    
-    rho = atmos(h,12); 
-    
-    [~,~,A,CD] = statefunc(t,m0,mdot0,tstage_index,tbo,T0,A0,V,h);
-    
-    T = 0;
-
-    omegaE = 0*[0;0;7.292115855377074e-5;];
-    muE = 3.986e5 * (1e3)^3; %m^3/s^2
-
-
-    rhat = r/norm(r);
-    Vhat = V/norm(V);
-    Vhat(isinf(Vhat)|isnan(Vhat)) = 0;
-
-    g = gfunc(r);
-    if t==0
-        T=T*rhat;
-    else
-        T = T*Vhat;
-    end
-    drag = -0.5*rho * CD * A * (norm(V)).^2 /m * Vhat;
-    dUdt(1:3) = V + cross(omegaE,r);
-    dUdt(4:6) = T/m + drag/m + g;
-end
-
-
-function dUdt = ode_steer(t,U,mdot0,stage,thrust_bool,T0,A0, gamma0,t0)
-    RE = 6371e3;   
-    d2r = pi/180;
-    
-    dUdt = zeros(7,1);
-    
-    r = U(1:3);
-    Vold = U(4:6);
-    m = U(7);
-    h = norm(r) - RE;
-    gammaold = gammafunc(r,Vold)*d2r;
-    gammaend = 0.8*pi/2;
-    gamma =  gamma0*d2r + (t-t0)*( (gammaend-gamma0*d2r)/(tstage_index(end,3)-t0)  );
-    
-
-    delta = gamma - gammaold;
-    
-    V = vecrot(r,Vold,delta);
-    
-    
-    rho = atmos(h,12); 
-    
-    A = A0(stage);
-    mdot = mdot0(stage);
-    CD = CD_func(r,V);
-    if thrust_bool==0
-        T = 0;
-        dUdt(7) = 0;
-    else
-        T = T0(stage);
-        dUdt(7) = -mdot;
-    end
-
-    omegaE = 0*[0;0;7.292115855377074e-5;];
-    muE = 3.986e5 * (1e3)^3; %m^3/s^2
-
-
-    rhat = r/norm(r);
-    Vhat = V/norm(V);
-    Vhat(isinf(Vhat)|isnan(Vhat)) = 0;
-    
-    g = gfunc(r);
-    if t==0
-        T=T*rhat;
-    else
-        T = T*Vhat;
-    end
-    drag = -0.5*rho * CD * A * (norm(V)).^2 /m * Vhat;
-    dUdt(1:3) = V + cross(omegaE,r);
-    dUdt(4:6) = T/m + drag/m + g;
-    
 end
 
 function Vnew = vecrot(r,Vold,delta)
@@ -736,25 +649,6 @@ function [value,isterminal,direction] = turncond(t,U,altPO)
     end
 end
 
-
-function [value,isterminal,direction] = crashcond(t,U)
-    RE = 6371e3;
-
-    r = U(1:3);
-    V = U(4:6);
-    h = norm(r) - RE;
-    if h < 0
-        value = 0;
-        isterminal = 1;
-        direction = 0;
-    else
-        value = 1;
-        isterminal = 0;
-        direction = 0;
-    end
-
-end
-
 function [value,isterminal,direction] = cruisecond(t,U)
     RE = 6371e3;
     d2r = pi/180;
@@ -762,7 +656,7 @@ function [value,isterminal,direction] = cruisecond(t,U)
     V = U(4:6);
     h = norm(r)-RE;
     gamma = gammafunc(r,V);
-    if abs(gamma-4.5) < 0.1
+    if abs(gamma-5.2) < 0.1
         value = 0;
         isterminal = 1;
         direction = 0;
