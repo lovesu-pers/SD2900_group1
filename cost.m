@@ -55,3 +55,5 @@ Claunch_ex = Cdevelopment_ex + Cvehicle_ex + Cflightops_ex + Cinsurance_ex;
 %cost using million dollars to calculate;
 
 plot (t,Claunch_re,t,Claunch_ex);
+
+%according to the plot image, cost of reusable is 9.15e+03, equals cost of expandable when t equals 10.3. After ten years of operational deployment, it becomes evident that the reusable rocket proves to be a more economically viable option among the two rockrt types.
