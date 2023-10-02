@@ -1,0 +1,26 @@
+%model the total launch cost as the sum of six individual components;
+Claunch.re = Cdevelopment.re + Cvehicle.re + Cflightops.re + Crecovery.re + Crefurb.re + Cinsurance.re;
+Claunch.ex = Cdevelopment.ex + Cvehicle.ex + Cflightops.ex + Cinsurance.ex;
+%where;
+%Claunch is total cost of launch in FY00 dollars(i.e., excluding
+%inflation?);
+%Cdevelopment is amortization of nonrecurring development cost;
+%Cvehicle.re is amortization of vehicle production cost;
+%Cvehicle.ex is recurring production cost(theoretical first unit
+%cost reduced by learning curve);
+%Cflightops is total cost of flight opretions per flight;
+%Crecovery is recurring cost of recovery(reusable only);
+%Crefurb is refurbishment cost(reusable only);
+%Cinsurance is cost of launch insurance;
+N = t * Nper;
+N.ex = N;
+N.re = N/100;
+%t year;
+%N launch total;
+%Ner launch per year;
+Nper = 15;
+Cdevelopment.re = 6000;
+Cdevelopment.ex = 1000;
+Cvehicle.re = 1000 * N.re;
+Cvehicle.re0 = 
+Cvehicle.ex = 50 * N.ex;
