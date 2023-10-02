@@ -462,11 +462,30 @@ end
 
 RAAN = RAAN * r2d;
 
+Hperigee = max(h_res(10000:43000));
+Hapogee = min(h_res(10000:43000));
+Htarget = 1000e3;
+
+a_parking = (Hperigee+Hapogee + 2*RE)/2;
+e_parking = 1-((Hapogee+RE)/a_parking);
+
 % Orbital parameters calculated with Gooding's paper's function
 Orb_param = eci2orb_gooding (muEkm, r_res(40000,:)/1000, V_res(40000,:)/1000);
 
 Orb_param(3:6)=Orb_param(3:6).*r2d;
-Orb_param(2:end)
+Orb_param(2:end);
+
+% Hohmann transfer calculations
+a_transfer = (Hperigee + Htarget + 2*RE)/2;
+V1 = sqrt(2*muE/(Hperigee+RE)-muE/a_parking);
+V1_prime = sqrt(2*muE/(Hperigee+RE)-muE/a_transfer);
+V2_prime = sqrt(2*muE/(Htarget+RE)-muE/a_transfer);
+V2 = sqrt(muE/(Htarget+RE));
+
+DeltaV1_Hohmann = V1_prime - V1;
+DeltaV2_Hohmann = V2 - V2_prime;
+DeltaVT_Hohmann = DeltaV1_Hohmann + DeltaV2_Hohmann;
+
 %% Functions 
 function dUdt = ode_turn(t,U,mdot0,stage,thrust_bool,T0,A0,Ae0,p_e)
     RE = 6371e3;
