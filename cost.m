@@ -2,7 +2,7 @@ t = linspace(0,50);
 Nper = 15;
 N = t * Nper;
 N_ex = N;
-N_re = N/100;
+N_re = ceil(N/100);
 %t year;
 %N launch total;
 %Ner launch per year;
