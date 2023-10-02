@@ -17,6 +17,7 @@ d2r = pi/180;
 r2d = 180/pi;
 RE = 6371e3;
 muE = 3.986e5 * (1e3)^3; %m^3/s^2
+muEkm = 3.986e5;
 g0 = 9.80665;
 omegaE = [0;0;7.292115855377074e-5;];
 
@@ -32,7 +33,7 @@ r0 = latlong2cart(lat0, long0, h0);
 rmag = norm(r0);
 V0 = [0;0;0];
 
-turn_azi = (90 - 26.6821)*d2r;
+turn_azi = (90 - 21.8)*d2r;
 
 addrot = 1; % Set to 1 if the velocity from earth's rotation %
             % should be added 
@@ -463,8 +464,23 @@ for i = 1:nf
     disp(['Movie frame: ', num2str(i), ' of ', num2str(nf)])
 end
 toc
+%% ORBITAL PARAMETER CALCULATION
+% RAAN by hand
+H_moment_res = cross(r_res(40000,:), V_res(40000,:));
+k_vect = [0,0,1];
+n_vect = cross(k_vect,H_moment_res);
 
+if (n_vect(2)>=0)
+    RAAN = acos(n_vect(1)/norm(n_vect));
+else
+    RAAN = 2*pi - acos(n_vect(1)/norm(n_vect));
+end
 
+RAAN = RAAN * r2d;
+
+% Orbital parameters calculated with Gooding's paper's function
+Orb_param = eci2orb_gooding (muEkm, r_res(40000,:)/1000, V_res(40000,:)/1000);
+Orb_param(3:6)=Orb_param(3:6).*r2d;
 %% Functions 
 function dUdt = ode_turn(t,U,mdot0,stage,thrust_bool,T0,A0)
     RE = 6371e3;
