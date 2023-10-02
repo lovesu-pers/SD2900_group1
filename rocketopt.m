@@ -83,7 +83,7 @@ function p=Nstage(vf,beta,epsilon,alpha,pi_geuss)
         fp = 0;
         for k=1:N
             f = f+beta(k)*log(epsilon(k)+alpha(k)*(1-epsilon(k))*p);
-            fp = fp+alpha(k)*beta(k)/(epsilon(k)+alpha(k)*(1-epsilon(k))*p);
+            fp = fp+alpha(k)*(1-epsilon(k))*beta(k)/(epsilon(k)+alpha(k)*(1-epsilon(k))*p);
         end
         d = -f/fp;
         p = p+d
