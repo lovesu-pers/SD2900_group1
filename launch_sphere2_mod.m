@@ -18,6 +18,7 @@ d2r = pi/180;
 r2d = 180/pi;
 RE = 6371e3;
 muE = 3.986e5 * (1e3)^3; %m^3/s^2
+muEkm = 3.986e5;
 g0 = 9.80665;
 p0 = 1013.25e2;
 omegaE = [0;0;7.292115855377074e-5;];
@@ -634,7 +635,44 @@ hold off
 % toc
 % 
 % 
-%%
+% %% ORBITAL PARAMETER CALCULATION
+% % RAAN by hand
+% H_moment_res = cross(r_res(8050,:), V_res(8050,:));
+% k_vect = [0,0,1];
+% n_vect = cross(k_vect,H_moment_res);
+% 
+% if (n_vect(2)>=0)
+%     RAAN = acos(n_vect(1)/norm(n_vect));
+% else
+%     RAAN = 2*pi - acos(n_vect(1)/norm(n_vect));
+% end
+% 
+% RAAN = RAAN * r2d;
+% 
+% Hperigee = max(h_res(3000:8050));
+% Hapogee = min(h_res(3000:8050));
+% Htarget = 1000e3;
+% 
+% a_parking = (Hperigee+Hapogee + 2*RE)/2;
+% e_parking = 1-((Hapogee+RE)/a_parking);
+% 
+% % Orbital parameters calculated with Gooding's paper's function
+% Orb_param = eci2orb_gooding (muEkm, r_res(8050,:)/1000, V_res(8050,:)/1000);
+% 
+% Orb_param(3:6)=Orb_param(3:6).*r2d;
+% Orb_param(2:end);
+% 
+% % Hohmann transfer calculations
+% a_transfer = (Hperigee + Htarget + 2*RE)/2;
+% V1 = sqrt(2*muE/(Hperigee+RE)-muE/a_parking);
+% V1_prime = sqrt(2*muE/(Hperigee+RE)-muE/a_transfer);
+% V2_prime = sqrt(2*muE/(Htarget+RE)-muE/a_transfer);
+% V2 = sqrt(muE/(Htarget+RE));
+% 
+% DeltaV1_Hohmann = V1_prime - V1;
+% DeltaV2_Hohmann = V2 - V2_prime;
+% DeltaVT_Hohmann = DeltaV1_Hohmann + DeltaV2_Hohmann;
+
 %% Functions 
 function dUdt = ode_turn(t,U,Isp,stage,thrust_bool,T0,A0,Ae0,p_e,Thrust_prop)
     RE = 6371e3;
