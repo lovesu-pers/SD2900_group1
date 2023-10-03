@@ -129,7 +129,8 @@ tic % Used to check performance of solvers, can be ignored
     [0, 10*60], U0, opts_turn);
 
 stage_index = ones(length(t_turn),1);
-thrust_index = T0(1)*ones(length(t_turn),1);
+thrust_index = ones(length(t_turn),1);
+Aindex = ones(length(t_turn),1);
 
 %2 Stage One
 V_turn = norm(U_turn(end,4:6)) * ([X_turn; Y_turn; Z_turn] - r0);
@@ -140,7 +141,7 @@ V_at_turn = norm(U_turn(end,4:6))
 % plot(t_stage1,vecnorm(U_stage1(:,1:3),2,2)-RE)
 % gamma_S1 = gammafunc(U_stage1(:,1:3),U_stage1(:,4:6));
 stage_index = [stage_index;ones(length(t_stage1),1)];
-thrust_index = [thrust_index;T0(1)*ones(length(t_stage1),1)];
+thrust_index = [thrust_index;ones(length(t_stage1),1)];
 
 
 
@@ -163,7 +164,7 @@ thrust_index = [thrust_index;0*ones(length(t_delay),1)];
     [t_delay(end), inf], [U_delay(end,1:3)';U_delay(end,4:6)';U_delay(end,7)], opts_reentb);
 
 stage_index = [stage_index;1*ones(length(t_reentb),1)];
-thrust_index = [thrust_index;0.8*T0(1)*ones(length(t_reentb),1)];
+thrust_index = [thrust_index;ones(length(t_reentb),1)];
 
 %4 Free fall until drogue deploy
 [t_freefall,U_freefall] = ode78(@(t,U) ode_main(t,U,Isp,1,0,T0,A0,Ae0,p_e,2), ...
@@ -189,20 +190,20 @@ thrust_index = [thrust_index;0*ones(length(t_b2),1)];
 stage_index = [stage_index;1*ones(length(t_b3),1)  ];
 thrust_index = [thrust_index;0*ones(length(t_b3),1)];
 
-figure
-V_temp = [vecnorm(U_b3(:,4:6),2,2)]
-plot(t_b3,V_temp)
-h_temp = vecnorm(U_b3(:,1:3),2,2)-RE;
-for i = 1:length(h_temp)
-    h_temp(i)
-    rho_temp(i) = atmos(h_temp(i),12);
-    q_temp(i) = 0.5*rho_temp(i)*V_temp(i)^2;
-end
-figure
-plot(t_b3,q_temp)
-
-figure
-plot(t_b3, h_temp/1e3)
+% figure
+% V_temp = [vecnorm(U_b3(:,4:6),2,2)]
+% plot(t_b3,V_temp)
+% h_temp = vecnorm(U_b3(:,1:3),2,2)-RE;
+% for i = 1:length(h_temp)
+%     h_temp(i)
+%     rho_temp(i) = atmos(h_temp(i),12);
+%     q_temp(i) = 0.5*rho_temp(i)*V_temp(i)^2;
+% end
+% figure
+% plot(t_b3,q_temp)
+% 
+% figure
+% plot(t_b3, h_temp/1e3)
 
 
 %6 Free fall until splashdown
@@ -211,17 +212,17 @@ plot(t_b3, h_temp/1e3)
 
 
 
-h_temp = vecnorm(U_land(:,1:3),2,2)-RE;
-V_temp = [vecnorm(U_land(:,4:6),2,2)]
-
-figure
-plot(t_land, h_temp/1e3)
-
-figure
-plot(t_land, V_temp)
+% h_temp = vecnorm(U_land(:,1:3),2,2)-RE;
+% V_temp = [vecnorm(U_land(:,4:6),2,2)]
+% 
+% figure
+% plot(t_land, h_temp/1e3)
+% 
+% figure
+% plot(t_land, V_temp)
 
 stage_index = [stage_index;1*ones(length(t_land),1)];
-thrust_index = [thrust_index;T0(1)*1*ones(length(t_land),1)];
+thrust_index = [thrust_index;ones(length(t_land),1)];
 
 %TOTAL FLIGHT Stage 1
 t_main = [t_turn; t_stage1; t_delay; t_reentb; t_freefall; t_b2; t_b3; t_land];
@@ -232,7 +233,7 @@ opts_stage2 = odeset('RelTol',1e-10, 'MaxStep',1 , ...
     'Stats','on', 'Events', @(t,U) stagecond(t,U,mf,2,tstop) );
 opts_cruise = odeset('RelTol',1e-10, 'MaxStep',0.5 , ...
     'Stats','on', 'Events',@(t,U) cruisecond(t,U));
-
+iju = length([t_turn; t_stage1]);
 if norm(U_stage1(end,1:3))<= RE+1
     t_stage2_burn1 = [];
     U_stage2_burn1 = [];
@@ -240,8 +241,8 @@ else
     t_stagesep = t_stage1(end);
     [t_stagesep_res,U_stagesep] = ode45(@(t,U) ode_main(t,U,Isp,2,0,T0,A0,Ae0,p_e,1), ...
     [t_stagesep, t_stagesep+tsep], [U_stage1(end,1:3)';U_stage1(end,4:6)';m0(2)], opts_stage2);
-    stage_index2 = [stage_index;0*ones(length(t_stagesep_res),1)];
-    thrust_index2 = [thrust_index;0*ones(length(t_stagesep_res),1)];
+    stage_index2 = [stage_index(1:iju);0*ones(length(t_stagesep_res),1)];
+    thrust_index2 = [thrust_index(1:iju);0*ones(length(t_stagesep_res),1)];
 
     t_stage2_start = t_stagesep_res(end);
     
@@ -300,10 +301,13 @@ else
         U_stage2_burn1 = [];
     end
 end
+
+
+
 s2_t = [t_turn; t_stage1; t_stagesep_res; t_stage2_burn1;t_stage2_cruise;t_stage2_burn2;t_stage2_orbit];
 s2_U = [U_turn; U_stage1;U_stagesep;U_stage2_burn1;U_stage2_cruise;U_stage2burn2;U_stage2_orbit];
-s2_Tindex = thrust_index2;
-s2_sindex = stage_index2;
+s2_Tindex = [thrust_index2];
+s2_sindex = [stage_index2];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Postprocessing      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -340,8 +344,10 @@ Mres = zeros(N,1);   % Mach
 CDres = zeros(N,1);  % Drag coeff
 rhot = zeros(N,1);
 gres = zeros(N,1);
-A = zeros(N,1);
+A_asc = zeros(N,1);
+
 Tres = thrust_index;
+Tres_asc = s2_Tindex;
 
 for j = 1:N
     % Lat-Long in ECI
@@ -362,8 +368,10 @@ for j = 1:N
 
     if stage_index(j) == 1
         A(j) = A0(1);
+        Tres(j) = thrust_index(j)*Tfunc(h_res(j),T0,Ae0,p_e,1);
     else
         A(j) = A0(2);
+        Tres(j) = thrust_index(j) * Tfunc(h_res(j),T0,Ae0,p_e,2);
     end
 
 end
@@ -383,8 +391,10 @@ r_ecef = zeros(nf,3);
 v_ecef = zeros(nf,3);
 latlong_ecef = zeros(nf, 2);
 tsf = zeros(nf,1);
-
-
+az = zeros(nf,1);
+elev = zeros(nf,1);
+range = zeros(nf,1);
+latalt = zeros(nf,1);
 for k = 1:nf
     tsf(k) = t_main(sf*k);
     
@@ -395,6 +405,19 @@ for k = 1:nf
     lla = eci2lla(r_res(sf*k,:),tt);
     latlong_ecef(k,1) = lla(1);
     latlong_ecef(k,2) = lla(2);
+    latalt(k) = lla(3);
+
+    aer = eci2aer(r_res(sf*k,:),tt,[latlong_ecef(1,1),latlong_ecef(1,2),latalt(1)]);
+    az(k) = aer(1);
+    elev(k) = aer(2);
+    range(k) = aer(3);
+    % 
+    % [X_loc(k), Y_loc(k), Z_loc(k)] = enu2ecef(r_res(sf*k,1),r_res(sf*k,2),r_res(sf*k,3), ... 
+    % latlong_ecef(1,1),latlong_ecef(1,2),latalt(1),earth_REF,"radians");
+
+    % crossrange(k) = range(k)*cos(elev(k)*d2r);
+    % localalt(k) = h_res(sf*k);
+
     disp(['ECEF-calc step: ', num2str(k), ' of ', num2str(nf)])
 end
 %%
@@ -415,6 +438,12 @@ sparefuel = (mp_curr+man1+man2)-mf(2);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Figures %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+figure(78)
+plot(t_main,Qdot/(10^2)^2)
+xlim([t_stagesep(1),t_land(1)])
+xlabel('Time, $t$ [s]')
+ylabel('Heat flux, $\dot{Q}$ [W/cm$^2$]  ')
+%%
 figure(5)
 subplot(6,1,1)
 plot(t_main,Vmag_res/1e3)
