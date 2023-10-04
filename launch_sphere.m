@@ -434,6 +434,117 @@ hold on
 [e1, axes1] = earth_test(t_main(end),RE);
 r_rocket = plot3(U_main(:,1),U_main(:,2),U_main(:,3), 'LineWidth',3,'Color','red');
 hold off
+
+
+%%
+
+
+figure(6)
+subplot(2,1,1)
+plot(ttemp,Vmag_res(1:TT)/1e3, 'LineWidth',3)
+ylabel('$|V|$ [km/s]')
+xlabel('$t$, [s]')
+xline(t_events)
+
+subplot(2,1,2)
+plot(ttemp,h_res(1:TT)/1e3, 'LineWidth',3)
+ylabel('$|h|$ [km]')
+xlabel('$t$, [s]')
+xline(t_events)
+
+f2 = figure
+subplot(2,1,1)
+plot(ttemp,mres(1:TT)/1e3)
+ylabel('$m$ [ton]') 
+xline(t_events)
+
+subplot(2,1,2)
+plot(ttemp,gamma(1:TT))
+ylabel('$\gamma$ [$^o$]')
+xline(t_events)
+
+annotation(f2,'textbox',...
+    [0.63195238095238 0.161904761904763 0.108523809523809 0.0634920634920645],...
+    'String','Circularize',...
+    'FitBoxToText','off',...
+    'EdgeColor','none');
+
+% Create textbox
+annotation(f2,'textbox',...
+    [0.483081582633053 0.160389610389612 0.10852380952381 0.0634920634920643],...
+    'String','Coast',...
+    'FitBoxToText','off',...
+    'EdgeColor','none');
+
+% Create textbox
+annotation(f2,'textbox',...
+    [0.35288200280112 0.148268398268399 0.108523809523809 0.0634920634920642],...
+    'String','Stage 2',...
+    'FitBoxToText','off',...
+    'EdgeColor','none');
+
+% Create textbox
+annotation(f2,'textbox',...
+    [0.178696078431373 0.256060606060606 0.10852380952381 0.0634920634920639],...
+    'String',{'Stage 1'},...
+    'FitBoxToText','off',...
+    'EdgeColor',[1 1 1]);
+%%
+figure(6)
+subplot(2,1,1)
+plot(t_main/60 ,Vmag_res/1e3, 'LineWidth',3)
+ylabel('$|V|$ [km/s]')
+xlabel('$t$, [min]')
+ylim([0, 9])
+xlim([0,187])
+
+subplot(2,1,2)
+plot(t_main/60,h_res/1e3, 'LineWidth',3)
+ylabel('$|h|$ [km]')
+xlabel('$t$, [min]')
+xlim([0,187])
+%%
+f3 = figure
+subplot(3,1,1)
+plot(ttemp, Tres(1:TT)/1e6, 'LineWidth',2)
+ylabel('$T$ [MN]')
+xline(t_events)
+ylim([-0,1.1])
+
+subplot(3,1,2)
+plot(ttemp,a_res(1:TT)/g0, 'LineWidth',2)
+ylabel('$a/g_0$ [-]')
+ylim([-1,10])
+xline(t_events)
+subplot(3,1,3)
+xline(t_events)
+plot(ttemp,q_R(1:TT)/1e3, 'LineWidth',2)
+xlabel('$t$, [s]')
+ylabel('$q$ [kPa]')
+ylim([0,91])
+xline(t_events)
+
+annotation(f3,'textbox',...
+    [0.63195238095238 0.161904761904763 0.108523809523809 0.0634920634920645],...
+    'String','Circularize',...
+    'FitBoxToText','off',...
+    'EdgeColor','none');
+
+% Create textbox
+annotation(f3,'textbox',...
+    [0.483081582633053 0.160389610389612 0.10852380952381 0.0634920634920643],...
+    'String','Coast',...
+    'FitBoxToText','off',...
+    'EdgeColor','none');
+
+% Create textbox
+annotation(f3,'textbox',...
+    [0.35288200280112 0.148268398268399 0.108523809523809 0.0634920634920642],...
+    'String','Stage 2',...
+    'FitBoxToText','off',...
+    'EdgeColor','none');
+
+
 %%
 % CDmach = zeros(500,1);
 % Va = 343*linspace(0.01, 10, 500);
