@@ -64,7 +64,7 @@ tstop = 220;  % Time when stage 2 should stop burning
 ms(1) = mf(1) - m0(2);
 ms(2) = mf(2) - 1000;
 altPO  = 12.1;
-turn_fp = 88.0*d2r;
+turn_fp = 87.9*d2r;
 turnvec = 1*[cos(turn_fp)*cos(turn_azi); ...
         cos(turn_fp)*sin(turn_azi); ...
         sin(turn_fp)];
@@ -93,12 +93,13 @@ U0 = [r0;V0;m0(1)];
 
 qdroguemax = 40e3;
 q_main_max = 50;
-Vcrit = 800;
+Vcrit = 1e3;
 delta_t = 10;
 V_break = 5;
 h_break = 2.08e3;
-hmaxdrogue = 80e3;
-q_break2 = 650;
+hmaxdrogue = 90e3;
+q_break2 = 1000;
+hslowdown = 51e3;
 
 opts_turn = odeset('RelTol',10e-10, 'Stats','on', ...
     'Events',@(t,U) turncond(t,U,altPO)); % Let ODE78 choose step size
@@ -114,10 +115,10 @@ opts_freefall = odeset('RelTol',1e-10, 'MaxStep',1 , ...
     'Stats','on', 'Events', @(t,U) freefallcond(t,U,qdroguemax,hmaxdrogue) );
 
 opts_break2 = odeset('RelTol',1e-10, 'MaxStep',10 , ...
-    'Stats','on', 'Events', @(t,U) break2cond(t,U,ms,q_break2) );
+    'Stats','on', 'Events', @(t,U) break2cond(t,U,ms,q_break2,hslowdown) );
 
 opts_break3 = odeset('RelTol',1e-10, 'MaxStep',10 , ...
-    'Stats','on', 'Events', @(t,U) break2cond(t,U,ms,q_main_max) );
+    'Stats','on', 'Events', @(t,U) break3cond(t,U,ms,q_main_max) );
 
 opts_land = odeset('RelTol',1e-10, 'MaxStep',100 , ...
     'Stats','on', 'Events', @(t,U) landcond(t,U,mf,ms,m0) );
@@ -184,12 +185,12 @@ thrust_index = [thrust_index;0*ones(length(t_b2),1)];
 
 
 %5 Free fall until main deploy
-[t_b3,U_b3] = ode45(@(t,U) ode_reentb(t,U,Isp,1,1,T0,A0,Ae0,p_e,0.1), ...
+[t_b3,U_b3] = ode45(@(t,U) ode_reentb(t,U,Isp,1,1,T0,A0,Ae0,p_e,1), ...
     [t_b2(end), inf], ...
     [U_b2(end,1:3)';U_b2(end,4:6)';U_b2(end,7)], opts_break3);
 
 stage_index = [stage_index;1*ones(length(t_b3),1)  ];
-thrust_index = [thrust_index;0*ones(length(t_b3),1)];
+thrust_index = [thrust_index;1*ones(length(t_b3),1)];
 
 % figure
 % V_temp = [vecnorm(U_b3(:,4:6),2,2)]
@@ -222,8 +223,8 @@ thrust_index = [thrust_index;0*ones(length(t_b3),1)];
 % figure
 % plot(t_land, V_temp)
 
-stage_index = [stage_index;1*ones(length(t_land),1)];
-thrust_index = [thrust_index;ones(length(t_land),1)];
+stage_index = [stage_index;0*ones(length(t_land),1)];
+thrust_index = [thrust_index;0*ones(length(t_land),1)];
 
 %TOTAL FLIGHT Stage 1
 t_main = [t_turn; t_stage1; t_delay; t_reentb; t_freefall; t_b2; t_b3; t_land];
@@ -283,7 +284,7 @@ else
                     opts_stage2.Events = @(t,U) stagecond(t,U,mf,2,inf);
                     [t_stage2_orbit,U_stage2_orbit] = ode45(@(t,U) ode_main(t,U,Isp,2,0,T0,A0,Ae0,p_e,1), ...
                     [t_stage2_burn2(end), t_stage2_burn2(end)+180*60], [U_stage2burn2(end,1:3)';U_stage2burn2(end,4:6)';U_stage2burn2(end,7)], opts_stage2);
-                    stage_index = [stage_index;2*ones(length(t_stage2_orbit),1)];
+                    stage_index2 = [stage_index;2*ones(length(t_stage2_orbit),1)];
                     thrust_index2 = [thrust_index2;0*ones(length(t_stage2_orbit),1)];
                 else
                     t_stage2_orbit = [];
@@ -327,6 +328,12 @@ for k = 2:N
     dt(k) =  t_main(k) - t_main(k-1);
 end
 
+% Results for the 
+r_res_s1s2 = s2_U(:,1:3);
+h_res_s1s2 = vecnorm(r_res_s1s2,2,2)-RE;
+V_res_s1s2 = s2_U(:,4:6);
+V_mag_res_s1s2 = vecnorm(V_res_s1s2,2,2);
+
 % Saves results in new vectors
 r_res = U_main(:,1:3);
 V_res = U_main(:,4:6); 
@@ -340,6 +347,7 @@ maxr = max(h_res+RE);
 
 gamma = zeros(N,1);  % Flightpath angle
 mres = U_main(:,7);   % Mass as function of time
+mres_s1s2 = s2_U(:,7);
 
 Mres = zeros(N,1);   % Mach 
 CDres = zeros(N,1);  % Drag coeff
@@ -350,21 +358,52 @@ A_asc = zeros(N,1);
 Tres = thrust_index;
 Tres_asc = s2_Tindex;
 
+gamma_s1s2 = zeros(length(s2_t),1);
+CDres_s1_s2 = zeros(length(s2_t),1);
+rhot_s1s2 = zeros(length(s2_t),1);
+gres_s1s2 = zeros(length(s2_t),1);
+
+for j = 1:length(s2_t)
+    gamma_s1s2(j) = gammafunc(r_res_s1s2(j,:),V_res_s1s2(j,:)); 
+    CDres_s1_s2(j) = CD_func(r_res_s1s2(j,:),V_res_s1s2(j,:));
+    rhot_s1s2(j) = atmos(h_res_s1s2(j),12);
+    gres_s1s2(j) = -norm(gfunc(r_res_s1s2(j,:)));
+
+    if s2_sindex(j) == 1
+        
+        A_asc(j) = A0(1);
+        Tres(j) = thrust_index(j)*Tfunc(h_res(j),T0,Ae0,p_e,1);
+    else
+        
+        A_asc(j) = A0(2);
+        
+    end
+end
+
 for j = 1:N
     % Lat-Long in ECI
     [latlong_res(j,1), latlong_res(j,2)] = cart2latlong(r_res(j,:));
     
     gamma(j) = gammafunc(r_res(j,:),V_res(j,:)); 
     
+    
+    
     CDres(j) = CD_func2(r_res(j,:),V_res(j,:));
+
+    
     
     Mres(j) = norm(V_res(j,:))/atmos(h_res(j),13);
 
     rhot(j) = atmos(h_res(j),12);
+    
 
     gres(j) = -norm(gfunc(r_res(j,:)));
+
     
-    Qdot(j) = 1/2*rhot(j)*norm(V_res(j,:))^3*A0(1)*CDres(j,:)/20;
+    
+    Qdot(j) = 1/2*rhot(j)*norm(V_res(j,:))^3 * A0(1)*CDres(j,:)/20;
+
+    
 
 
     if stage_index(j) == 1
@@ -376,10 +415,21 @@ for j = 1:N
     end
 
 end
-
+q_R_s1s2 = 0.5*V_mag_res_s1s2.^2.*rhot_s1s2;
 q_R = 0.5*Vmag_res.^2.*rhot;
 
+% Time span when deltaV losses should be calculated
+t_burn = [t_turn; t_stage1; t_stagesep_res; t_stage2_burn1;t_stage2_cruise;t_stage2_burn2];
+i_burn = length(t_burn);
 
+% Delta V calculations 
+air_loss_int = CDres_s1_s2.*A_asc.*q_R_s1s2./mres_s1s2;
+g_loss_int = gres_s1s2.*sin(gamma_s1s2*d2r);
+delta_V_air = -cumtrapz(t_burn,air_loss_int(1:i_burn)); % Cumulative integral
+delta_V_air_tot = -trapz(t_burn,air_loss_int(1:i_burn));
+
+delta_V_grav = -cumtrapz(t_burn,g_loss_int(1:i_burn));
+delta_V_grav_tot = -trapz(t_burn,g_loss_int(1:i_burn));
 
 % Losses are only accounted for during burn time
 
@@ -440,10 +490,10 @@ sparefuel = (mp_curr+man1+man2)-mf(2);
 %% Figures %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 figure(78)
-plot(t_main,Qdot/(10^2)^2)
-xlim([t_stagesep(1),t_land(1)])
+plot(t_main,Qdot/1000)
+xlim([150,800])
 xlabel('Time, $t$ [s]')
-ylabel('Heat flux, $\dot{Q}$ [W/cm$^2$]  ')
+ylabel('$\dot{Q}$ [kW/m$^2$]  ')
 %%
 figure(5)
 subplot(6,1,1)
@@ -531,6 +581,13 @@ plot(t_main,q_R/1e3)
 xlabel('$t$, [s]')
 ylabel('Dynamic pressure $q$ [kPa]')
 
+%%
+figure(777)
+plot(t_main/60,q_R)
+xlabel('$t$, [min]')
+ylabel('Dynamic pressure $q$ [Pa]')
+xlim([505/60,inf])
+%%
 
 figure(200)
 geoscatter(latlong_ecef(:,1), latlong_ecef(:,2) )
@@ -544,6 +601,57 @@ subplot(2,1,2)
 plot(t_main, Mres)
 ylabel('$M$ [-]')
 xlim([0,600])
+
+%%
+s2_t = [t_turn; t_stage1; t_stagesep_res; t_stage2_burn1;t_stage2_cruise;t_stage2_burn2;t_stage2_orbit];
+t_main = [t_turn; t_stage1; t_delay; t_reentb; t_freefall; t_b2; t_b3; t_land];
+% t_events = [t_stagesep_res(1),133, t_b2(1),t_b3(1),t_land(1)]
+f1=figure
+subplot(2,1,1)
+plot(ttemp,Vmag_res(1:TT)/1e3)
+ylabel('$|V|$ [km/s]')
+% xline(t_events)
+
+subplot(2,1,2)
+plot(ttemp,h_res(1:TT)/1e3)
+ylabel('$|h|$ [km]')
+xlabel('$t$ [s]')
+% xline(t_events)
+%%
+figure(55)
+subplot(2,1,1)
+plot(t_main/60,Vmag_res)
+ylabel('$|V|$ [m/s]')
+xlim([1000/60,inf])
+
+subplot(2,1,2)
+plot(t_main/60,h_res/1e3)
+ylabel('$|h|$ [km]')
+xlabel('$t$ [min]')
+xlim([1000/60,inf])
+%%
+subplot(6,1,3)
+plot(ttemp,mres(1:TT)/1e3)
+ylabel('$m$ [ton]') 
+xline(t_events)
+
+subplot(6,1,4)
+plot(ttemp,gamma(1:TT))
+ylabel('$\gamma$ [$^o$]')
+xline(t_events)
+subplot(6,1,5)
+plot(ttemp, Tres(1:TT)/1e6)
+ylabel('$T$ [MN]')
+xline(t_events)
+subplot(6,1,6)
+plot(ttemp,a_res(1:TT)/g0)
+xlabel('$t$, [s]')
+ylabel('$a/g_0$ [-]')
+ylim([-1,10])
+xline(t_events)
+
+
+
 %%
 gammas2 = gammafunc(s2_U(:,1:3), s2_U(:,4:6));
 figure(789)
@@ -635,43 +743,58 @@ hold off
 % toc
 % 
 % 
-% %% ORBITAL PARAMETER CALCULATION
-% % RAAN by hand
-% H_moment_res = cross(r_res(8050,:), V_res(8050,:));
-% k_vect = [0,0,1];
-% n_vect = cross(k_vect,H_moment_res);
-% 
-% if (n_vect(2)>=0)
-%     RAAN = acos(n_vect(1)/norm(n_vect));
-% else
-%     RAAN = 2*pi - acos(n_vect(1)/norm(n_vect));
-% end
-% 
-% RAAN = RAAN * r2d;
-% 
-% Hperigee = max(h_res(3000:8050));
-% Hapogee = min(h_res(3000:8050));
-% Htarget = 1000e3;
-% 
-% a_parking = (Hperigee+Hapogee + 2*RE)/2;
-% e_parking = 1-((Hapogee+RE)/a_parking);
-% 
-% % Orbital parameters calculated with Gooding's paper's function
-% Orb_param = eci2orb_gooding (muEkm, r_res(8050,:)/1000, V_res(8050,:)/1000);
-% 
-% Orb_param(3:6)=Orb_param(3:6).*r2d;
-% Orb_param(2:end);
-% 
-% % Hohmann transfer calculations
-% a_transfer = (Hperigee + Htarget + 2*RE)/2;
-% V1 = sqrt(2*muE/(Hperigee+RE)-muE/a_parking);
-% V1_prime = sqrt(2*muE/(Hperigee+RE)-muE/a_transfer);
-% V2_prime = sqrt(2*muE/(Htarget+RE)-muE/a_transfer);
-% V2 = sqrt(muE/(Htarget+RE));
-% 
-% DeltaV1_Hohmann = V1_prime - V1;
-% DeltaV2_Hohmann = V2 - V2_prime;
-% DeltaVT_Hohmann = DeltaV1_Hohmann + DeltaV2_Hohmann;
+%% ORBITAL PARAMETER CALCULATION
+% RAAN by hand
+m_park = s2_U(end,7);
+dV_inpark = -g0*Isp(2)*log(mf(2)/m_park)
+dV_launch = DeltaVtot - dV_inpark
+H_moment_res = cross(r_res_s1s2(end,:), V_res_s1s2(end,:));
+k_vect = [0,0,1];
+n_vect = cross(k_vect,H_moment_res);
+
+if (n_vect(2)>=0)
+    RAAN = acos(n_vect(1)/norm(n_vect));
+else
+    RAAN = 2*pi - acos(n_vect(1)/norm(n_vect));
+end
+
+RAAN = RAAN * r2d;
+
+Hperigee = max(h_res_s1s2(10000:40e3));
+Hapogee = min(h_res_s1s2(10e3:40e3));
+Htarget = 1000e3;
+
+a_parking = (Hperigee+Hapogee + 2*RE)/2;
+e_parking = 1-((Hapogee+RE)/a_parking);
+
+% Orbital parameters calculated with Gooding's paper's function
+Orb_param = eci2orb_gooding (muEkm, r_res_s1s2(end,:)/1000, V_res_s1s2(end,:)/1000);
+
+Orb_param(3:6)=Orb_param(3:6).*r2d;
+Orb_param(2:end)
+
+% Hohmann transfer calculations
+a_transfer = (Hperigee + Htarget + 2*RE)/2;
+V1 = sqrt(2*muE/(Hperigee+RE)-muE/a_parking);
+V1_prime = sqrt(2*muE/(Hperigee+RE)-muE/a_transfer);
+V2_prime = sqrt(2*muE/(Htarget+RE)-muE/a_transfer);
+V2 = sqrt(muE/(Htarget+RE));
+
+DeltaV1_Hohmann = V1_prime - V1
+DeltaV2_Hohmann = V2 - V2_prime
+DeltaVT_Hohmann = DeltaV1_Hohmann + DeltaV2_Hohmann
+%%
+figure(789)
+subplot(2,1,1)
+
+plot(s2_t,vecnorm(s2_U(:,4:6),2,2)/1e3)
+ylabel('$|V|$ [km/s]')
+% xline(t_events)
+
+subplot(2,1,2)
+plot(s2_t,vecnorm(s2_U(:,1:3),2,2)/1e3-RE/1e3)
+ylabel('$|h|$ [km]')
+% xline(t_events)
 
 %% Functions 
 function dUdt = ode_turn(t,U,Isp,stage,thrust_bool,T0,A0,Ae0,p_e,Thrust_prop)
@@ -1077,7 +1200,7 @@ function [value,isterminal,direction] = stage1cond(t,U,m0,ms,Isp,g0,mprop)
 
     dVmax = -g0*Isp(1)*log( (ms(1)+0.2*mprop(1))/ms(1) );
 
-    if mp1 < 0.01*mprop(1)
+    if mp1 < 0.05*mprop(1)
         value = 0;
         isterminal = 1;
         direction = 0;
@@ -1193,9 +1316,40 @@ function [value,isterminal,direction] = delay_cond(t,U,t0,delta_t)
         direction = 0;
     end
 end
+function [value,isterminal,direction]  = break2cond(t,U,ms,q_main_max,h_slowdown)
+    RE = 6371e3;
+    m = U(7);
+    r = U(1:3);
+    h = norm(r) - RE;
+    V = norm(U(4:6));
+
+    q = 0.5*atmos(h,12)*V^2;
+
+    if m <= ms(1)
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    elseif h<=h_slowdown
+         value = 0;
+        isterminal = 1;
+        direction = 0;
+    elseif q <= q_main_max
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    elseif h <= 0
+        value = 0;
+        isterminal = 1;
+        direction = 0;
+    else
+        value = 1;
+        isterminal = 0;
+        direction = 0;
+    end
+end 
 
 
-function [value,isterminal,direction]  = break2cond(t,U,ms,q_main_max)
+function [value,isterminal,direction]  = break3cond(t,U,ms,q_main_max)
     RE = 6371e3;
     m = U(7);
     r = U(1:3);
@@ -1260,7 +1414,7 @@ function [value,isterminal,direction] = cruisecond(t,U)
     V = U(4:6);
     h = norm(r)-RE;
     gamma = gammafunc(r.',V.');
-    if gamma-5 < 0.1
+    if gamma-5.5 < 0.1
         value = 0;
         isterminal = 1;
         direction = 0;
