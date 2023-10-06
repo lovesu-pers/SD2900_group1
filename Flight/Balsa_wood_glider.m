@@ -5,22 +5,122 @@
 % Max chord length = 100 mm
 % Fuselage building material available: 5 x 15 x 1000 mm
 % Lifting surfaces building material available: 2.5 x 100 x 1000 mm
+close all; clc; clear
 
 %% Constants and design parameters
 Cl_alpha = 0.11 * 180 / pi; % Sectional lift curve slope of flat plate [rad^-1]
+eps_slope = 0.1;            % (\partial \varepsilon) / (\partial \alpha)
+etaHT = 1;                 % Tail effectiveness: eta_HT = qt/q
+
+alpha = 0:0.2:5;            % Range of angles of attack calculated [deg]
 
 %% Initial reference surface estimation
 % Assume the glider has the highest values for fuselage length and
 % wingspan. Rectangular planform shape:
 
 b = 500;            % Wingspan [mm]
-AR = 6;             % Aspect ratio [-]; should be between 4.5 and 7.5
+AR = 5;             % Aspect ratio [-]; should be between 4.5 and 7.5
 c = b/AR;           % Mean chord [mm]
 S = b^2/AR;         % Wing area (reference area)
 
-L_f = 500;          % Length of fuselage
+xf = 500;           % Dim. of fuselage x (length)
+yf = 15;            % y
+zf = 5;             % z
+
+xt = 40;            % Dim. of tail x (chord)
+yt = 340;           % y 
+zt = 2.5;           % z
+
+xw = 100;           % Dim. of wingspan x
+yw = 500;           % y
+zw = zt;            % z
+
+V_t = xt*yt*zt;     % Tail volume
+V_w = xw*yw*zw;     % Wing volume
+V_f = xf*yf*zf;     % Fuselage volume
+
+% Centroid calculations
+xLE_w = 100;        % Position of wing LE from nose      
+xj_w = 50;          % Position of wing centroid with reference to wing LE
+xLE_t = 460;        % Position of tail LE from nose  
+xj_t = 20;          % Position of tail centroid with reference to tail LE
+
+xi_t = xLE_t + xj_t;    % Position of wing centroid with reference to nose
+xi_w = xLE_w + xj_w;    % Position of tail centroid with reference to nose
+
+xi_f = xf/2;            % Position of fuselage centroid
+
+x_cg_w = 50;            % Centre of gravity of the wing
+
+%% Calculation of wing lift coefficient of lifting surfaces
+CL_alpha = Cl_alpha * AR / (2+sqrt(AR^2 + 4));                  % Lift curve slope of flat plate eq(9-73)
 
 %% Initial estimations for horizontal and vertical tail
-S_H = 0.2 * S;      % Horizontal tail area
-S_T = 0.5 * S_H;    % Vertical tail planform area
+S_H = 0.2 * S;          % Horizontal tail area
+S_T = 0.5 * S_H;        % Vertical tail planform area
 
+Vol_w = S * 2.5;        % Wing volume
+Vol_HT = S_H * 2.5;     % Horizontal tail volume
+Vol_VT = S_T * 2.5;     % Vertical tail volume
+
+x_cg = (xi_w*Vol_w + xi_t * Vol_HT + xi_f * V_f)/(Vol_HT + Vol_w + V_f);     % Centre of Mass
+x_cg_bar = x_cg / c;                                                         % Dimensionless centre of mass                    
+
+%% Wing Contribution
+% Equations (24-67), (24-71)
+x_ac = c/4;                                         % Aerodynamic centre of the wing
+x_ac_bar = 1/4;                                     % Dimensionless aerodynamic centre of the wing
+
+CL0_w = 0;                                          % Zero lift coefficient of the wing (symmetrical)
+CMac_w = 0;                                         % Moment coefficient of the wing about its AC (symmetrical wing)
+
+CM0_w = CMac_w + CL0_w * (x_cg_bar - x_ac_bar);     % Residual pitch moment coefficient of the wing (symmetrical)
+CMalpha_w = CL_alpha * (x_cg_bar - x_ac_bar);       % Longitudinal Stability derivative of the wing (- for stability)
+
+% CL_w plot (linear part)
+CL_w = CL0_w + CL_alpha * deg2rad(alpha);
+figure(1)
+plot(rad2deg(alpha), CL_w);
+xlabel('\alpha (deg)')
+ylabel('C_{L_w}')
+title('Lift curve (linear section) of the wing')
+
+% CM_w plot
+CM_w = CM0_w + CMalpha_w * deg2rad(alpha);
+figure(2)
+plot(rad2deg(alpha), CM_w);
+xlabel('\alpha (deg)')
+ylabel('C_{M_w}')
+title('Pitch moment curve of the wing')
+
+%% Horizontal Tail Contribution
+% Equations (24-68) and (24-73)
+x_ac_HT = xt/4;                                         % Aerodynamic centre of the tail
+
+CL0_HT = 0;                                             % Zero lift coefficient of the wing (symmetrical)
+CMac_HT = 0;                                            % Moment coefficient of the wing about its AC (symmetrical wing)   
+
+l_HT_bar = (x_ac_HT - x_cg)/c;                          % Distance from CG to AC_HT
+
+CM0_HT = CMac_HT + CL0_HT * (l_HT_bar);                 % Residual pitch moment coefficient of the HT (symmetrical)
+
+VHT = S_H*l_HT_bar/S;                                   % Horizontal tail volume
+CMalpha_HT = -etaHT * VHT * CL_alpha * (1-eps_slope);   % Longitudinal Stability derivative of the HT (- for stability)
+
+% CL_HT plot (linear part)
+CL_HT = CL0_HT + CL_alpha * deg2rad(alpha);
+figure(3)
+plot(rad2deg(alpha), CL_HT);
+xlabel('\alpha (deg)')
+ylabel('C_{L_{HT}}')
+title('Lift curve (linear section) of the horizontal tail')
+
+% CM_HT plot
+CM_HT = CM0_HT + CMalpha_HT * deg2rad(alpha);
+figure(4)
+plot(rad2deg(alpha), CM_HT);
+xlabel('\alpha (deg)')
+ylabel('C_{M_{HT}}')
+title('Pitch moment curve of the horizontal tail')
+
+%% Stick-fixed longitudinal stability
