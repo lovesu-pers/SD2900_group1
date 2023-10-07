@@ -80,7 +80,7 @@ CMalpha_w = CL_alpha * (x_cg_bar - x_ac_bar);       % Longitudinal Stability der
 % CL_w plot (linear part)
 CL_w = CL0_w + CL_alpha * deg2rad(alpha);
 figure(1)
-plot(rad2deg(alpha), CL_w);
+plot(alpha, CL_w);
 xlabel('\alpha (deg)')
 ylabel('C_{L_w}')
 title('Lift curve (linear section) of the wing')
@@ -88,7 +88,7 @@ title('Lift curve (linear section) of the wing')
 % CM_w plot
 CM_w = CM0_w + CMalpha_w * deg2rad(alpha);
 figure(2)
-plot(rad2deg(alpha), CM_w);
+plot(alpha, CM_w);
 xlabel('\alpha (deg)')
 ylabel('C_{M_w}')
 title('Pitch moment curve of the wing')
@@ -100,7 +100,7 @@ x_ac_HT = xt/4;                                         % Aerodynamic centre of 
 CL0_HT = 0;                                             % Zero lift coefficient of the wing (symmetrical)
 CMac_HT = 0;                                            % Moment coefficient of the wing about its AC (symmetrical wing)   
 
-l_HT_bar = (x_ac_HT - x_cg)/c;                          % Distance from CG to AC_HT
+l_HT_bar = (x_ac_HT + xLE_t - x_cg)/c;                  % Distance from CG to AC_HT
 
 CM0_HT = CMac_HT + CL0_HT * (l_HT_bar);                 % Residual pitch moment coefficient of the HT (symmetrical)
 
@@ -110,7 +110,7 @@ CMalpha_HT = -etaHT * VHT * CL_alpha * (1-eps_slope);   % Longitudinal Stability
 % CL_HT plot (linear part)
 CL_HT = CL0_HT + CL_alpha * deg2rad(alpha);
 figure(3)
-plot(rad2deg(alpha), CL_HT);
+plot(alpha, CL_HT);
 xlabel('\alpha (deg)')
 ylabel('C_{L_{HT}}')
 title('Lift curve (linear section) of the horizontal tail')
@@ -118,9 +118,35 @@ title('Lift curve (linear section) of the horizontal tail')
 % CM_HT plot
 CM_HT = CM0_HT + CMalpha_HT * deg2rad(alpha);
 figure(4)
-plot(rad2deg(alpha), CM_HT);
+plot(alpha, CM_HT);
 xlabel('\alpha (deg)')
 ylabel('C_{M_{HT}}')
 title('Pitch moment curve of the horizontal tail')
 
 %% Stick-fixed longitudinal stability
+i_w = 0;                                            % Wing incidence angle
+i_t = 0;                                            % Tail incidence angle
+
+dfus = 2*sqrt((yf/2)^2 + (zf/2)^2);                 % "Diameter" of the fuselage
+K_WB = 1 + 0.025 * (dfus/b) - 0.25 * (dfus/b)^2;    % Fuselage correction factor                 
+
+CL0 = CL0_w + etaHT * S_H/S * CL0_HT;                                                   % Zero lift coefficient of glider
+CLalpha = K_WB * CL_alpha + etaHT * S_H/S * CL_alpha * (1-eps_slope);                   % Slope of lift curve of glider
+CM0 = CM0_w + etaHT * VHT * CL_alpha * (i_w + i_t);                                     % Residual moment coefficient of glider
+CMalpha = CL_alpha * (x_cg_bar - x_ac_bar) - etaHT * VHT * CL_alpha * (1-eps_slope);    % Longitudinal stability of glider
+
+% CL_TOT plot (linear part)
+CL = CL0 + CLalpha * deg2rad(alpha);
+figure(5)
+plot(alpha, CL);
+xlabel('\alpha (deg)')
+ylabel('C_{L}')
+title('Lift curve (linear section) of the glider')
+
+% CM_TOT plot
+CM = CM0 + CMalpha * deg2rad(alpha);
+figure(6)
+plot(alpha, CM);
+xlabel('\alpha (deg)')
+ylabel('C_{M}')
+title('Pitch moment curve of the glider')
