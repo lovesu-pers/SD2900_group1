@@ -28,7 +28,7 @@ yf = 15;            % y
 zf = 5;             % z
 
 xt = 40;            % Dim. of tail x (chord)
-yt = 340;           % y 
+yt = 100;           % y 
 zt = 2.5;           % z
 
 xw = 100;           % Dim. of wingspan x
@@ -44,7 +44,7 @@ xLE_w = 150;        % Position of wing LE from nose
 xj_w = 50;          % Position of wing centroid with reference to wing LE
 xLE_t = 420-80;        % Position of tail LE from nose  
 xj_t = 20;          % Position of tail centroid with reference to tail LE
-xLE_VT = 420-80;       % Position of vertical tail LE from nose
+xLE_VT = 420-80;       % Position of vertical tail LE from nose 
 xj_VT = 20;         % Poistion of vertical tail centroid with reference to vertical tail LE
 
 xi_t = xLE_t + xj_t;    % Position of wing centroid with reference to nose
@@ -53,9 +53,11 @@ xi_VT = xLE_VT + xj_VT; % Position of vertical tail centroid with reference to n
 xi_f = xf/2;            % Position of fuselage centroid
 
 x_cg_w = 50;            % Centre of gravity of the wing
+ARt = xt/yt;            % Aspect ratio of the tail
 
 %% Calculation of wing lift coefficient of lifting surfaces
-CL_alpha = Cl_alpha * AR / (2+sqrt(AR^2 + 4));                  % Lift curve slope of flat plate eq(9-73)
+CL_alpha_w = Cl_alpha * AR / (2+sqrt(AR^2 + 4));                  % Lift curve slope of wing eq(9-73)
+CL_alpha_t = Cl_alpha * ARt / (2+sqrt(ARt^2 + 4));                % Lift curve slope of tail eq(9-73)
 
 %% Initial estimations for horizontal and vertical tail
 S_H = 0.2 * S;          % Horizontal tail area
@@ -66,7 +68,7 @@ Vol_HT = S_H * 2.5;     % Horizontal tail volume
 Vol_VT = S_T * 2.5;     % Vertical tail volume
 
 % Mass addition
-M = 0.003;                  % Added mass [kg]
+M = 0.005;                  % Added mass [kg]
 rho_B = 120;                % Density of balsa wood [kg * m^-3]
 Vol_M = M/rho_B * 10^9;     % Equivalent balsa wood volume of the added mass [mm^3]
 xi_M = 10;                  % Position of the added mass with reference to the nose
@@ -141,7 +143,7 @@ title('Pitch moment curve of the horizontal tail')
 
 %% Stick-fixed longitudinal stability
 i_w = 0;                                            % Wing incidence angle
-i_t = 0.5;                                            % Tail incidence angle
+i_t = deg2rad(-0.5);                                            % Tail incidence angle
 
 % Aerodynamic centre of glider CHECK THE ORIGIN OF THIS!
 x_ac_bar = (x_ac_w_bar + CL_alpha/CL_alpha * etaHT * S_H/S * x_ac_HT_bar * (1-eps_slope))/...
