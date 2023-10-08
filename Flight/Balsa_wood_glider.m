@@ -44,10 +44,12 @@ xLE_w = 100;        % Position of wing LE from nose
 xj_w = 50;          % Position of wing centroid with reference to wing LE
 xLE_t = 460;        % Position of tail LE from nose  
 xj_t = 20;          % Position of tail centroid with reference to tail LE
+xLE_VT = 460;       % Position of vertical tail LE from nose
+xj_VT = 20;         % Poistion of vertical tail centroid with reference to vertical tail LE
 
 xi_t = xLE_t + xj_t;    % Position of wing centroid with reference to nose
 xi_w = xLE_w + xj_w;    % Position of tail centroid with reference to nose
-
+xi_VT = xLE_VT + xj_VT; % Position of vertical tail centroid with reference to nose
 xi_f = xf/2;            % Position of fuselage centroid
 
 x_cg_w = 50;            % Centre of gravity of the wing
@@ -63,7 +65,7 @@ Vol_w = S * 2.5;        % Wing volume
 Vol_HT = S_H * 2.5;     % Horizontal tail volume
 Vol_VT = S_T * 2.5;     % Vertical tail volume
 
-x_cg = (xi_w*Vol_w + xi_t * Vol_HT + xi_f * V_f)/(Vol_HT + Vol_w + V_f);     % Centre of Mass with respect to nose
+x_cg = (xi_w*Vol_w + xi_t * Vol_HT + xi_f * V_f + xi_VT * Vol_VT)/(Vol_HT + Vol_w + V_f + Vol_VT);     % Centre of Mass with respect to nose
 x_cg_bar = x_cg / c;                                                         % Dimensionless centre of mass with respect to nose                 
 
 % Centre of mass with respect to wing LE
@@ -105,7 +107,7 @@ x_ac_HT_bar = x_ac_HT / c;
 CL0_HT = 0;                                             % Zero lift coefficient of the wing (symmetrical)
 CMac_HT = 0;                                            % Moment coefficient of the wing about its AC (symmetrical wing)   
 
-l_HT_bar = (x_ac_HT - x_cg)/c;                  % Distance from CG to AC_HT
+l_HT_bar = (x_ac_HT - x_cg_2)/c;                  % Distance from CG to AC_HT
 
 CM0_HT = CMac_HT + CL0_HT * (l_HT_bar);                 % Residual pitch moment coefficient of the HT (symmetrical)
 
@@ -162,4 +164,4 @@ title('Pitch moment curve of the glider')
 
    
             
-SM = x_ac_bar - x_cg_2_bar;           % Static margin
+SM = x_ac_bar - x_cg_2_bar           % Static margin
