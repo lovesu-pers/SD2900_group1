@@ -14,6 +14,9 @@ etaHT = 1;                 % Tail effectiveness: eta_HT = qt/q
 
 alpha = 0:0.2:5;            % Range of angles of attack calculated [deg]
 
+m_f = 10.4*1e-3;                     % Mass of entire fuselage [kg]
+rho_balsa = m_f/(1*5e-3*15e-3)       % Density of the balsa [kg/m^3]
+
 %% Initial reference surface estimation
 % Assume the glider has the highest values for fuselage length and
 % wingspan. Rectangular planform shape:
