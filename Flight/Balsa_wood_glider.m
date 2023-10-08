@@ -66,7 +66,7 @@ Vol_HT = S_H * 2.5;     % Horizontal tail volume
 Vol_VT = S_T * 2.5;     % Vertical tail volume
 
 % Mass addition
-M = 0.005;              % Added mass [kg]
+M = 0.009;              % Added mass [kg]
 rho_B = 120;            % Density of balsa wood [kg * m^-3]
 Vol_M = M/rho_B * 10^9;   % Equivalent balsa wood volume of the added mass [mm^3]
 xi_M = 10;              % Position of the added mass with reference to the nose
