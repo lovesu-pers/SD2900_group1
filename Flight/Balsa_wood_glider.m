@@ -67,7 +67,7 @@ x_cg = (xi_w*Vol_w + xi_t * Vol_HT + xi_f * V_f)/(Vol_HT + Vol_w + V_f);     % C
 x_cg_bar = x_cg / c;                                                         % Dimensionless centre of mass with respect to nose                 
 
 % Centre of mass with respect to wing LE
-x_cg_2 = (xj_w*Vol_w + (xj_t + xLE_t - xLE_w) * Vol_HT + (xi_f - xLE_w) * V_f)/(Vol_HT + Vol_w + V_f);
+x_cg_2 = x_cg - xLE_w;
 x_cg_2_bar = x_cg_2/c;
 
 %% Wing Contribution
