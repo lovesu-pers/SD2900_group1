@@ -40,7 +40,7 @@ V_w = xw*yw*zw;     % Wing volume
 V_f = xf*yf*zf;     % Fuselage volume
 
 % Centroid calculations
-xLE_w = 150;        % Position of wing LE from nose      
+xLE_w = 120;        % Position of wing LE from nose      
 xj_w = 50;          % Position of wing centroid with reference to wing LE
 xLE_t = 420-80;        % Position of tail LE from nose  
 xj_t = 20;          % Position of tail centroid with reference to tail LE
