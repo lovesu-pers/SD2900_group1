@@ -44,7 +44,7 @@ xLE_w = 100;        % Position of wing LE from nose
 xj_w = 50;          % Position of wing centroid with reference to wing LE
 xLE_t = 460;        % Position of tail LE from nose  
 xj_t = 20;          % Position of tail centroid with reference to tail LE
-xLE_VT = 460;       % Postion of 
+xLE_VT = 460;       % Position of vertical tail LE from nose
 xj_VT = 20;         % Poistion of vertical tail centroid with reference to vertical tail LE
 
 xi_t = xLE_t + xj_t;    % Position of wing centroid with reference to nose
@@ -64,6 +64,12 @@ S_T = 0.5 * S_H;        % Vertical tail planform area
 Vol_w = S * 2.5;        % Wing volume
 Vol_HT = S_H * 2.5;     % Horizontal tail volume
 Vol_VT = S_T * 2.5;     % Vertical tail volume
+
+% Mass addition
+M = 0.005;              % Added mass [kg]
+rho_B = 120;            % Density of balsa wood [kg * m^-3]
+V_M = M/rho_B;          % Equivalent balsa wood volume of the added mass
+xi_M = 10;  
 
 x_cg = (xi_w*Vol_w + xi_t * Vol_HT + xi_f * V_f + xi_VT * Vol_VT)/(Vol_HT + Vol_w + V_f + Vol_VT);     % Centre of Mass with respect to nose
 x_cg_bar = x_cg / c;                                                         % Dimensionless centre of mass with respect to nose                 
@@ -107,7 +113,7 @@ x_ac_HT_bar = x_ac_HT / c;
 CL0_HT = 0;                                             % Zero lift coefficient of the wing (symmetrical)
 CMac_HT = 0;                                            % Moment coefficient of the wing about its AC (symmetrical wing)   
 
-l_HT_bar = (x_ac_HT - x_cg)/c;                  % Distance from CG to AC_HT
+l_HT_bar = (x_ac_HT - x_cg_2)/c;                        % Distance from CG to AC_HT
 
 CM0_HT = CMac_HT + CL0_HT * (l_HT_bar);                 % Residual pitch moment coefficient of the HT (symmetrical)
 
