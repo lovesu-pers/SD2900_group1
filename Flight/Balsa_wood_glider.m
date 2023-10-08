@@ -23,7 +23,8 @@ AR = 5;             % Aspect ratio [-]; should be between 4.5 and 7.5
 c = b/AR;           % Mean chord [mm]
 S = b^2/AR;         % Wing area (reference area)
 
-xf = 420;           % Dim. of fuselage x (length)
+% xf = 420;           % Dim. of fuselage x (length)
+xf = 500;
 yf = 15;            % y
 zf = 5;             % z
 
@@ -42,9 +43,9 @@ V_f = xf*yf*zf;     % Fuselage volume
 % Centroid calculations
 xLE_w = 150;        % Position of wing LE from nose      
 xj_w = 50;          % Position of wing centroid with reference to wing LE
-xLE_t = 440-80;        % Position of tail LE from nose  
+xLE_t = 420-80;        % Position of tail LE from nose  
 xj_t = 20;          % Position of tail centroid with reference to tail LE
-xLE_VT = 460;       % Position of vertical tail LE from nose
+xLE_VT = 420-80;       % Position of vertical tail LE from nose 
 xj_VT = 20;         % Poistion of vertical tail centroid with reference to vertical tail LE
 
 xi_t = xLE_t + xj_t;    % Position of wing centroid with reference to nose
@@ -66,11 +67,11 @@ Vol_HT = S_H * 2.5;     % Horizontal tail volume
 Vol_VT = S_T * 2.5;     % Vertical tail volume
 
 % Mass addition
-M = 0.009;              % Added mass [kg]
-rho_B = 120;            % Density of balsa wood [kg * m^-3]
-Vol_M = M/rho_B * 10^9;   % Equivalent balsa wood volume of the added mass [mm^3]
-xi_M = 10;              % Position of the added mass with reference to the nose
-x_M = xi_M - xLE_w;     % Position of the added mass with reference to wing LE
+M = 0.005;                  % Added mass [kg]
+rho_B = 120;                % Density of balsa wood [kg * m^-3]
+Vol_M = M/rho_B * 10^9;     % Equivalent balsa wood volume of the added mass [mm^3]
+xi_M = 10;                  % Position of the added mass with reference to the nose
+x_M = xi_M - xLE_w;         % Position of the added mass with reference to wing LE
 
 
 x_cg = (xi_w*Vol_w + xi_t * Vol_HT + xi_f * V_f + xi_VT * Vol_VT + x_M * Vol_M)/...
@@ -141,7 +142,7 @@ title('Pitch moment curve of the horizontal tail')
 
 %% Stick-fixed longitudinal stability
 i_w = 0;                                            % Wing incidence angle
-i_t = 0;                                            % Tail incidence angle
+i_t = deg2rad(-0.5);                                            % Tail incidence angle
 
 % Aerodynamic centre of glider CHECK THE ORIGIN OF THIS!
 x_ac_bar = (x_ac_w_bar + CL_alpha/CL_alpha * etaHT * S_H/S * x_ac_HT_bar * (1-eps_slope))/...
@@ -152,7 +153,7 @@ K_WB = 1 + 0.025 * (dfus/b) - 0.25 * (dfus/b)^2;    % Fuselage correction factor
 
 CL0 = CL0_w + etaHT * S_H/S * CL0_HT;                                                   % Zero lift coefficient of glider
 CLalpha = K_WB * CL_alpha + etaHT * S_H/S * CL_alpha * (1-eps_slope);                   % Slope of lift curve of glider
-CM0 = CM0_w + etaHT * VHT * CL_alpha * (i_w + i_t);                                     % Residual moment coefficient of glider
+CM0 = CM0_w + etaHT * VHT * CL_alpha * (i_w - i_t);                                     % Residual moment coefficient of glider
 CMalpha = CL_alpha * (x_cg_2_bar - x_ac_bar) - etaHT * VHT * CL_alpha * (1-eps_slope);   % Longitudinal stability of glider
 CMalpha_true = CMalpha * pi/180
 
