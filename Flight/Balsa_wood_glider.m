@@ -18,12 +18,12 @@ alpha = 0:0.2:5;            % Range of angles of attack calculated [deg]
 % Assume the glider has the highest values for fuselage length and
 % wingspan. Rectangular planform shape:
 
-b = 500;            % Wingspan [mm]
+b = 400;            % Wingspan [mm]
 AR = 5;             % Aspect ratio [-]; should be between 4.5 and 7.5
 c = b/AR;           % Mean chord [mm]
 S = b^2/AR;         % Wing area (reference area)
 
-xf = 500;           % Dim. of fuselage x (length)
+xf = 420;           % Dim. of fuselage x (length)
 yf = 15;            % y
 zf = 5;             % z
 
@@ -32,17 +32,17 @@ yt = 340;           % y
 zt = 2.5;           % z
 
 xw = 100;           % Dim. of wingspan x
-yw = 500;           % y
+yw = b;             % y
 zw = zt;            % z
-
+    
 V_t = xt*yt*zt;     % Tail volume
 V_w = xw*yw*zw;     % Wing volume
 V_f = xf*yf*zf;     % Fuselage volume
 
 % Centroid calculations
-xLE_w = 100;        % Position of wing LE from nose      
+xLE_w = 150;        % Position of wing LE from nose      
 xj_w = 50;          % Position of wing centroid with reference to wing LE
-xLE_t = 460;        % Position of tail LE from nose  
+xLE_t = 440-80;        % Position of tail LE from nose  
 xj_t = 20;          % Position of tail centroid with reference to tail LE
 xLE_VT = 460;       % Position of vertical tail LE from nose
 xj_VT = 20;         % Poistion of vertical tail centroid with reference to vertical tail LE
@@ -83,11 +83,11 @@ x_cg_2_bar = x_cg_2/c;
 
 %% Wing Contribution
 % Equations (24-67), (24-71)
-x_ac_w = c/4;                                         % Aerodynamic centre of the wing
-x_ac_w_bar = 1/4;                                     % Dimensionless aerodynamic centre of the wing
+x_ac_w = c/4;                                           % Aerodynamic centre of the wing
+x_ac_w_bar = 1/4;                                       % Dimensionless aerodynamic centre of the wing
 
-CL0_w = 0;                                          % Zero lift coefficient of the wing (symmetrical)
-CMac_w = 0;                                         % Moment coefficient of the wing about its AC (symmetrical wing)
+CL0_w = 0;                                              % Zero lift coefficient of the wing (symmetrical)
+CMac_w = 0;                                             % Moment coefficient of the wing about its AC (symmetrical wing)
 
 CM0_w = CMac_w + CL0_w * (x_cg_2_bar - x_ac_w_bar);     % Residual pitch moment coefficient of the wing (symmetrical)
 CMalpha_w = CL_alpha * (x_cg_2_bar - x_ac_w_bar);       % Longitudinal Stability derivative of the wing (- for stability)
@@ -110,7 +110,7 @@ title('Pitch moment curve of the wing')
 
 %% Horizontal Tail Contribution
 % Equations (24-68) and (24-73)
-x_ac_HT = xt/4 + xLE_t - xLE_w;                        % Aerodynamic centre of the tail
+x_ac_HT = xt/4 + xLE_t - xLE_w;                         % Aerodynamic centre of the tail
 x_ac_HT_bar = x_ac_HT / c;
 
 CL0_HT = 0;                                             % Zero lift coefficient of the wing (symmetrical)
@@ -153,7 +153,8 @@ K_WB = 1 + 0.025 * (dfus/b) - 0.25 * (dfus/b)^2;    % Fuselage correction factor
 CL0 = CL0_w + etaHT * S_H/S * CL0_HT;                                                   % Zero lift coefficient of glider
 CLalpha = K_WB * CL_alpha + etaHT * S_H/S * CL_alpha * (1-eps_slope);                   % Slope of lift curve of glider
 CM0 = CM0_w + etaHT * VHT * CL_alpha * (i_w + i_t);                                     % Residual moment coefficient of glider
-CMalpha = CL_alpha * (x_cg_2_bar - x_ac_bar) - etaHT * VHT * CL_alpha * (1-eps_slope)   % Longitudinal stability of glider
+CMalpha = CL_alpha * (x_cg_2_bar - x_ac_bar) - etaHT * VHT * CL_alpha * (1-eps_slope);   % Longitudinal stability of glider
+CMalpha_true = CMalpha * pi/180
 
 % CL_TOT plot (linear part)
 CL = CL0 + CLalpha * deg2rad(alpha);
@@ -174,3 +175,4 @@ title('Pitch moment curve of the glider')
    
             
 SM = x_ac_bar - x_cg_2_bar           % Static margin
+SM_2 = -CMalpha/CLalpha
