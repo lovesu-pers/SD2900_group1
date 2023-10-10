@@ -21,16 +21,16 @@ rho_balsa = m_f/(1*5e-3*15e-3)       % Density of the balsa [kg/m^3]
 % Assume the glider has the highest values for fuselage length and
 % wingspan. Rectangular planform shape:
 
-b = 400;            % Wingspan [mm]
+b = 300;            % Wingspan [mm]
 AR = 5;             % Aspect ratio [-]; should be between 4.5 and 7.5
 c = b/AR;           % Mean chord [mm]
 S = b^2/AR;         % Wing area (reference area)
 
-xf = 420;           % Dim. of fuselage x (length)
+xf = 300;           % Dim. of fuselage x (length)
 yf = 15;            % y
 zf = 5;             % z
 
-xt = 40;            % Dim. of tail x (chord)
+xt = 30;            % Dim. of tail x (chord)
 yt = 100;           % y 
 zt = 2.5;           % z
 
@@ -43,11 +43,11 @@ V_w = xw*yw*zw;     % Wing volume
 V_f = xf*yf*zf;     % Fuselage volume
 
 % Centroid calculations
-xLE_w = 120;        % Position of wing LE from nose      
+xLE_w = 60;        % Position of wing LE from nose      
 xj_w = 50;          % Position of wing centroid with reference to wing LE
-xLE_t = 420-40;        % Position of tail LE from nose  
+xLE_t = 300-30;        % Position of tail LE from nose  
 xj_t = 20;          % Position of tail centroid with reference to tail LE
-xLE_VT = 420-40;       % Position of vertical tail LE from nose 
+xLE_VT = 300-30;       % Position of vertical tail LE from nose 
 xj_VT = 20;         % Poistion of vertical tail centroid with reference to vertical tail LE
 
 xi_t = xLE_t + xj_t;    % Position of wing centroid with reference to nose
@@ -62,6 +62,8 @@ S_H = 0.2 * S;          % Horizontal tail area
 S_T = 0.5 * S_H;        % Vertical tail planform area
 bt = S_H/xt;            % Span of the tail
 ARt = bt^2/S_H;
+ct = S_H/bt;
+b_VT = S_T/ct;
 
 Vol_w = S * 2.5;        % Wing volume
 Vol_HT = S_H * 2.5;     % Horizontal tail volume
@@ -182,3 +184,21 @@ title('Pitch moment curve of the glider')
             
 SM = x_ac_bar - x_cg_2_bar           % Static margin
 SM_2 = -CMalpha/CLalpha
+%% Trim Conditions
+i_w = 0*pi/180;                                            % Wing incidence angle
+i_t = -3*pi/180;                                            % Tail incidence angle
+rho = 120;  %kg/m^3
+g = 9.81;  %m/s^2
+
+V = V_f + Vol_HT + Vol_w;
+W = rho*g*V*(10^(-9));   %N
+x_ac_HT_bar = x_ac_HT/c;
+CMih = (-CL_alpha_t)*etaHT*(S_H/S)*(x_ac_HT_bar-x_cg_bar);
+CM0 = CM0_w + etaHT * VHT * CLalpha * (i_w - i_t);  
+alpha_trim = (-CM0-CMih*i_t)/(CMalpha)
+
+
+
+CLalpha0 = CL_alpha_w*i_w - CL_alpha_t*i_t*(S_H/S);
+CL_trim = CLalpha0 + CLalpha*alpha_trim;
+Vtrim = sqrt(2*W/(CL_trim* rho *S*10^(-6)))
