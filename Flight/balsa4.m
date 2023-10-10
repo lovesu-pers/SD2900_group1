@@ -183,7 +183,7 @@ SM_2 = -CMalpha/CLalpha
 %% Trim Conditions
 i_w = 1.5*pi/180;                                            % Wing incidence angle
 i_t = -1*pi/180;                                            % Tail incidence angle
-rho = 120;  %kg/m^3
+rho = 139;  %kg/m^3
 g = 9.78;  %m/s^2
 
 V = V_f + V_t +V_w;
