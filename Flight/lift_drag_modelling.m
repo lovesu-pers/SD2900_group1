@@ -6,7 +6,7 @@
 % According to the table of typical values of maximum lift coefficient -
 % the coefficient value tange of millitary trainers 
 % https://www.ae.utexas.edu/~varghesep/class/aircraft/Suggestions.p
-CL = ;
+%need CL or we can use the maximum CLmax for analysis?
 CLmax = 1.8; 
 % Maximum lift coefficient normally 1.2-1.8
 CLmaxl = 2.5; 
@@ -51,4 +51,6 @@ Mach = 0.263;
 V_cruise = Mach*340.2900; % cruise speed m/s 
 rho = 0.909; %kg/m3
 Re = (rho * V_cruise*c)/mu; %Reynolds numbers
-CDi = (CL^2)/(pi*A*e);
+CDimax = (CLmax^2)/(pi*A*e);
+Cf = Cfe; % skin friction coeeficient, same as equivalent one before
+CDf = Cf*k; % skin friction drag coefficient
